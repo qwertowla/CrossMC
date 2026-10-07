@@ -11,6 +11,8 @@
 第一个宿主实现是 **CrossMC-HowToFish**（位于 `hosts/HowToFish/`）：它把 Minecraft 渲染出的画面
 合成进 **How to Fish**（Unity 6 / Mono / BepInEx）。
 
+**CrossMC 目前主要面向 Minecraft 1.21.1 + Fabric**，这是现阶段唯一支持的 Minecraft 环境。
+
 > **状态：Phase 0 完成。Phase 1 的 Minecraft 取帧端已实现，宿主消费端是下一步。**
 > 尚未做玩家 / 相机 / 输入 / 深度同步。
 

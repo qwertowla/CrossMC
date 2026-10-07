@@ -20,6 +20,11 @@ Minecraft's rendered frame into **How to Fish** (Unity 6 / Mono / BepInEx).
 第一个宿主实现是 **CrossMC-HowToFish**（位于 `hosts/HowToFish/`）：它把 Minecraft 渲染出的画面
 合成进 **How to Fish**（Unity 6 / Mono / BepInEx）。
 
+**CrossMC is built primarily for Minecraft 1.21.1 + Fabric** — that is the only supported Minecraft
+setup for now.
+
+**CrossMC 目前主要面向 Minecraft 1.21.1 + Fabric**，这是现阶段唯一支持的 Minecraft 环境。
+
 > **Status: Phase 0 complete. Phase 1 Minecraft frame producer implemented; the host consumer is
 > next.** No player/camera/input/depth sync yet.
 
