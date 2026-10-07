@@ -4,8 +4,9 @@
 
 > ⚠️ **本项目尚未完成（开发中）。** 协议布局、bindings 与仓库结构均不稳定，可能随时调整。
 
-**CrossMC** 是一个跨进程桥接框架：把 **Minecraft（Java 版，Fabric）** 当作后台渲染器 / 工具侧，
-接入一个**独立的宿主游戏**。
+**CrossMC** 是一个通用的、与具体游戏无关的**跨进程桥接框架**：把 **Minecraft（Java 版，Fabric）**
+与一个**独立的宿主游戏**连接起来。两个进程通过共享内存交换渲染帧、状态与输入：Minecraft 作为渲染 /
+工具侧，宿主游戏负责显示与合成。
 
 第一个宿主实现是 **CrossMC-HowToFish**（位于 `hosts/HowToFish/`）：它把 Minecraft 渲染出的画面
 合成进 **How to Fish**（Unity 6 / Mono / BepInEx）。
