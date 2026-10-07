@@ -1,6 +1,6 @@
 # CrossMC
 
-[Chinese](README_ZH.md) | **English**
+[中文](README_ZH.md) | **English**
 
 > ⚠️ **This project is unfinished (work in progress).** The protocol layout, the bindings and the
 > repository structure are unstable and may change at any time.
