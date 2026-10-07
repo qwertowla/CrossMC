@@ -2,6 +2,9 @@
 
 [中文](README_ZH.md) | **English**
 
+> ⚠️ **This project is unfinished (work in progress).** The protocol layout, the bindings and the
+> repository structure are unstable and may change at any time.
+
 **CrossMC** is a cross-process bridge framework for running **Minecraft (Java Edition, Fabric)**
 as a background renderer/tool-side and wiring it into a **standalone host game**.
 
