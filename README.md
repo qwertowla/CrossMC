@@ -1,12 +1,15 @@
 # CrossMC
 
+[中文](README_ZH.md) | **English**
+
 **CrossMC** is a cross-process bridge framework for running **Minecraft (Java Edition, Fabric)**
 as a background renderer/tool-side and wiring it into a **standalone host game**.
 
 The first host implementation is **CrossMC-HowToFish** (under `hosts/HowToFish/`): it composites
 Minecraft's rendered frame into **How to Fish** (Unity 6 / Mono / BepInEx).
 
-> **Status: Phase 0 — repository skeleton and design documents only. No runtime code yet.**
+> **Status: Phase 0 complete. Phase 1 Minecraft frame producer implemented; the host consumer is
+> next.** No player/camera/input/depth sync yet.
 
 Long-term shape:
 
@@ -77,6 +80,10 @@ transport, host composition.
 
 Fixed for Phase 0/1: **Windows only**, **Minecraft 1.21.1 + Fabric**, **file-backed shared memory**,
 **CPU readback**, **triple buffer**, **How to Fish as the only host**.
+
+Progress: the Java binding and the Minecraft frame producer (`minecraft/FrameExporter`) are
+implemented and build; the C# host consumer is not started. See `minecraft/README.md` and
+`docs/ROADMAP.md`.
 
 ---
 
