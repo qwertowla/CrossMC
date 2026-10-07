@@ -1,0 +1,23 @@
+{
+	"schemaVersion": 1,
+	"id": "crossmc",
+	"version": "${version}",
+	"name": "CrossMC",
+	"description": "Minecraft side of the CrossMC cross-process bridge (frame producer for a host game).",
+	"authors": [
+		"CrossMC contributors"
+	],
+	"license": "MIT",
+	"environment": "client",
+	"entrypoints": {
+		"client": [
+			"dev.crossmc.minecraft.CrossMcMinecraftClient"
+		]
+	},
+	"depends": {
+		"fabricloader": ">=0.19.5",
+		"minecraft": "~1.21.1",
+		"java": ">=21",
+		"fabric-api": "*"
+	}
+}

@@ -1,0 +1,30 @@
+# Build / tooling
+[Bb]in/
+[Oo]bj/
+[Dd]ebug/
+[Rr]elease/
+*.user
+*.suo
+.vs/
+
+# Java / Gradle
+.gradle/
+build/
+build-selftest/
+out/
+*.class
+*.log
+
+# IDE
+.idea/
+*.iml
+.vscode/
+*.swp
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Local scratch
+.tools/
+.baseline/
