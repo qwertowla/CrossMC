@@ -7,7 +7,8 @@ under `hosts/HowToFish/`).
 
 ## What belongs here
 
-- Open/close the file-backed mapping `%LOCALAPPDATA%\CrossMC\bridge_v1.bin`.
+- Open/close the file-backed mapping (default `%LOCALAPPDATA%\CrossMC\bridge_v2.bin`, resolved from
+  the same `config/crossmc.properties` as the Java side).
 - Seqlock read/write helpers for `HostState` / `McState`.
 - Triple-buffer reader/writer for overlay frame slots.
 - Struct definitions mirrored from `protocol/bridge_protocol.h` (keep sizes identical).

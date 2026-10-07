@@ -12,7 +12,8 @@ This adapter is game-specific by design. It may know about Unity, BepInEx, Harmo
 
 ## Responsibility
 
-- Open the CrossMC shared memory (`%LOCALAPPDATA%\CrossMC\bridge_v1.bin`) as the frame **consumer**.
+- Open the CrossMC shared memory (path from `config/crossmc.properties`, default
+  `%LOCALAPPDATA%\CrossMC\bridge_v2.bin`) as the frame **consumer**.
 - On the Unity main thread: upload the received BGRA frame to a Unity texture and draw it as an
   overlay rectangle (Phase 1).
 - Later: camera/player access, input, depth, in-scene compositing.

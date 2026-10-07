@@ -69,14 +69,18 @@ as separate repositories.
 
 `config/crossmc.properties` controls where the shared memory lives (`mapping.path`). Both processes
 must resolve the same absolute file. The value supports `%VAR%` placeholders and a leading `~`, e.g.
-`%LOCALAPPDATA%/CrossMC/bridge_v1.bin`.
+`%LOCALAPPDATA%/CrossMC/bridge_v2.bin`.
 
 The config file is found in this order (first match wins):
 
 1. `-Dcrossmc.config=<path>` (JVM) or `CROSSMC_CONFIG=<path>` (environment);
 2. `./config/crossmc.properties` (relative to the working directory);
 3. `%LOCALAPPDATA%/CrossMC/crossmc.properties` (user-level override);
-4. the built-in default.
+4. the bundled `crossmc.properties` resource (the mod jar ships `config/crossmc.properties`);
+5. the built-in default.
+
+So the Minecraft mod always has a working default from its own jar; a user file or env override
+wins.
 
 ---
 

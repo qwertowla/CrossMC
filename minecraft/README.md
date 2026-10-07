@@ -18,6 +18,10 @@ Fabric API 0.116.17+1.21.1). Mostly game-independent across hosts.
 Opens the file-backed shared memory on client init, creates the header + seeds the triple buffer if
 it is the first process, otherwise registers its pid on the existing header. Writes the MC heartbeat.
 
+The mapping path comes from `config/crossmc.properties` (`mapping.path`). The mod jar bundles that
+file as `/crossmc.properties`, so it always has a default; a user file at the instance's
+`config/crossmc.properties`, or `CROSSMC_CONFIG`, overrides it (see the main README "Configuration").
+
 ### `FrameExporter`
 
 Registered on Fabric's `WorldRenderEvents.END`. On the render thread it:
@@ -50,7 +54,7 @@ $env:JAVA_HOME='<path to a JDK 25 installation>'
 $env:Path="$env:JAVA_HOME\bin;$env:Path"
 Set-Location minecraft
 .\gradlew.bat build --no-daemon --console=plain
-# -> build\libs\crossmc-minecraft-0.1.0.jar
+# -> build\libs\crossmc-fabric-0.1.0.jar
 ```
 
 ## Notes

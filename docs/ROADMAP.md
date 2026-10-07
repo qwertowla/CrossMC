@@ -36,10 +36,15 @@ Validates: protocol, shared memory, triple buffer, frame transport, host composi
 **Not** in this phase: player sync, input, depth, terrain, entities, combat, full camera sync.
 
 Progress:
-- Java binding (`bindings/java`) — done, `ShmSelfTest` PASS.
+- Protocol v2 (`protocol/bridge_protocol.h`) — C-compatible, with Header size/sequence/timestamp,
+  HostState/McState (incl. roll/eye/timestamp), OverlayControl + OverlayFrameSlot, and reserved
+  InputRing/InputEvent + DepthFrame layouts.
+- Java binding (`bindings/java`) — done, `ShmSelfTest` PASS: file-backed mapping, triple buffer,
+  and HostState/McState **seqlocks**. Standalone Gradle build (`gradlew -p bindings/java selftest`).
 - Minecraft frame producer (`minecraft/FrameExporter`) — done: `WorldRenderEvents.END` →
-  `glReadPixels` (BGRA8, bottom-up) → `BridgeMemory.publishFrame`. Needs real-client verification
-  (image content/orientation, readback cost).
+  `glReadPixels` (BGRA8, bottom-up) → `BridgeMemory.publishFrame`, plus config-driven mapping path
+  bundled into the jar. Needs real-client verification (image content/orientation, readback cost).
+- McState publishing / HostState consumption on the Minecraft side — not wired yet (Phase 2).
 - Host consumer (`bindings/csharp` + the `hosts/HowToFish` BepInEx plugin) — not started.
 
 ## Phase 2 — Player / camera sync

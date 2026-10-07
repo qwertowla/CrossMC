@@ -1,7 +1,8 @@
 # ARCHITECTURE — CrossMC
 
-> Status: **draft v0.1 (Phase 0)**. This document defines the framework shape and the first
-> vertical slice. No runtime code exists yet.
+> Status: **draft v0.2**. Phase 0 complete; the Phase 1 Minecraft frame producer exists
+> (`minecraft/FrameExporter`). This document defines the framework shape and the first vertical
+> slice.
 
 ---
 
@@ -118,7 +119,7 @@ Minecraft (Fabric)
   3. write into the next free triple-buffer slot
   4. publish the slot (atomic swap)
 
-  ─────────── file-backed shared memory: %LOCALAPPDATA%\CrossMC\bridge_v1.bin ───────────
+  ───── file-backed shared memory (path from config/crossmc.properties) ─────
 
 How to Fish (BepInEx)   [on the Unity main thread]
   5. if a fresh overlay slot is available, swap it in
@@ -146,7 +147,7 @@ camera sync, input, terrain, entities, combat, GPU sharing, frame lockstep.
 | Platform | Windows only (no macOS/Linux/CrossOver) |
 | Minecraft | 1.21.1 + Fabric (Loader 0.19.5, Fabric API 0.116.17+1.21.1) |
 | Host | How to Fish only (Unity 6 / Mono / BepInEx 5) |
-| Transport | File-backed shared memory, path from `config/crossmc.properties` `mapping.path` (default `%LOCALAPPDATA%\CrossMC\bridge_v1.bin`) |
+| Transport | File-backed shared memory, path from `config/crossmc.properties` `mapping.path` (default `%LOCALAPPDATA%\CrossMC\bridge_v2.bin`) |
 | Frame transfer | CPU readback (no GPU interop yet) |
 | Frame buffering | Triple buffer |
 | State sync | Seqlock latest-value slots |
@@ -159,7 +160,8 @@ camera sync, input, terrain, entities, combat, GPU sharing, frame lockstep.
 ## 8. Synchronisation primitives (our own encoding)
 
 - **Seqlock** for small latest-value structs: a `seq` counter is odd during a write and even after;
-  readers retry while odd or changed. Single writer per slot.
+  readers retry while odd or changed. Single writer per slot. Implemented in `bindings/java` for
+  `HostState`/`McState` (`writeHostState`/`readHostState`, `writeMcState`/`readMcState`).
 - **Triple buffer** for frames: one 32-bit atomic `state` word encodes the "middle" slot plus a
   `fresh` bit; the writer fills a private back slab then atomically swaps `state`; the reader
   swaps only when `fresh` is set. Lock-free; never blocks; never tears.

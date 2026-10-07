@@ -63,14 +63,17 @@ CrossMC/
 ## 配置
 
 `config/crossmc.properties` 控制共享内存的位置（`mapping.path`）。两个进程必须解析到同一个绝对路径。
-值支持 `%VAR%` 占位符与前导 `~`，例如 `%LOCALAPPDATA%/CrossMC/bridge_v1.bin`。
+值支持 `%VAR%` 占位符与前导 `~`，例如 `%LOCALAPPDATA%/CrossMC/bridge_v2.bin`。
 
 配置文件的查找顺序（先匹配者优先）：
 
 1. `-Dcrossmc.config=<路径>`（JVM）或 `CROSSMC_CONFIG=<路径>`（环境变量）；
 2. `./config/crossmc.properties`（相对于工作目录）；
 3. `%LOCALAPPDATA%/CrossMC/crossmc.properties`（用户级覆盖）；
-4. 内置默认值。
+4. 打包内置的 `crossmc.properties` 资源（mod jar 内已含 `config/crossmc.properties`）；
+5. 内置默认值。
+
+因此 Minecraft mod 始终能从自己的 jar 拿到可用的默认配置；用户文件或环境变量可覆盖。
 
 ---
 

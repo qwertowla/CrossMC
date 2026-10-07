@@ -10,9 +10,9 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Mirror of {@code protocol/bridge_protocol.h}. Keep offsets, sizes and constants identical
- * to the C header and to the C# binding. Bump {@link #VERSION} in all three when the layout
- * changes.
+ * Mirror of {@code protocol/bridge_protocol.h}. Keep offsets, sizes and constants identical to
+ * the C header (which is the single source of truth) and to the C# binding. Bump {@link #VERSION}
+ * in all three when the layout changes.
  *
  * <p>Shared memory is <b>file-backed</b>: the Java side cannot open Win32 named sections
  * ({@code Local\...}), only map a file. Both processes map the same file (see
@@ -23,14 +23,15 @@ public final class Protocol {
 	}
 
 	public static final int MAGIC = 0x42434D43;   // 'C','M','C','B'
-	public static final int VERSION = 1;
+	public static final int VERSION = 2;
 
 	public static final String MAPPING_SUBDIR = "CrossMC";
-	public static final String MAPPING_FILE = "bridge_v1.bin";
+	public static final String MAPPING_FILE = "bridge_v2.bin";
 
 	// ---- configuration (see config/crossmc.properties) ---------------------------------
 	public static final String CONFIG_DIR = "config";
 	public static final String CONFIG_FILE = "crossmc.properties";
+	public static final String CONFIG_RESOURCE = "/crossmc.properties";
 	public static final String KEY_MAPPING_PATH = "mapping.path";
 	public static final String DEFAULT_MAPPING_PATH =
 			"%LOCALAPPDATA%/" + MAPPING_SUBDIR + "/" + MAPPING_FILE;
@@ -45,36 +46,99 @@ public final class Protocol {
 	public static final long OFF_HOST_STATE = 0x0100L;
 	public static final long OFF_MC_STATE = 0x0200L;
 	public static final long OFF_OVERLAY_CTL = 0x0300L;
-	public static final long OFF_OVERLAY_HDRS = 0x0340L;
+	public static final long OFF_OVERLAY_SLOTS = 0x0340L;
+	public static final long OFF_DEPTH_FRAME = 0x0400L;
 	public static final long OFF_INPUT_RING = 0x1000L;
+	public static final long OFF_INPUT_EVENTS = 0x1040L;
 	public static final long OFF_FRAMES = 0x100000L;
 	public static final long MAPPING_BYTES = OFF_FRAMES + FRAME_SLOT_BYTES * 3L;
 
+	// struct sizes (must equal the C static_asserts)
+	public static final int HEADER_SIZE = 0x50;
+	public static final int HOST_STATE_SIZE = 0x58;
+	public static final int MC_STATE_SIZE = 0x90;
+	public static final int OVERLAY_CONTROL_SIZE = 0x20;
+	public static final int OVERLAY_SLOT_SIZE = 0x40;
+	public static final int INPUT_EVENT_SIZE = 0x18;
+	public static final int INPUT_RING_SIZE = 0x10;
+	public static final int DEPTH_FRAME_SIZE = 0x30;
+
 	public static final int OVERLAY_SLOTS = 3;
-	public static final int SLOT_HDR_SIZE = 0x40;
+	public static final int INPUT_RING_ENTRIES = 2048;
 
 	// Header field offsets
 	public static final long HDR_MAGIC = OFF_HEADER + 0L;
 	public static final long HDR_VERSION = OFF_HEADER + 4L;
-	public static final long HDR_MAPPING_BYTES = OFF_HEADER + 8L;
-	public static final long HDR_FLAGS = OFF_HEADER + 12L;
-	public static final long HDR_HOST_PID = OFF_HEADER + 16L;
-	public static final long HDR_MC_PID = OFF_HEADER + 20L;
-	public static final long HDR_HOST_HEARTBEAT = OFF_HEADER + 24L;
-	public static final long HDR_MC_HEARTBEAT = OFF_HEADER + 32L;
+	public static final long HDR_HEADER_SIZE = OFF_HEADER + 8L;
+	public static final long HDR_MAPPING_BYTES = OFF_HEADER + 12L;
+	public static final long HDR_FLAGS = OFF_HEADER + 16L;
+	public static final long HDR_HOST_PID = OFF_HEADER + 20L;
+	public static final long HDR_MC_PID = OFF_HEADER + 24L;
+	public static final long HDR_HOST_STATE_SIZE = OFF_HEADER + 28L;
+	public static final long HDR_MC_STATE_SIZE = OFF_HEADER + 32L;
+	public static final long HDR_OVERLAY_SLOT_SIZE = OFF_HEADER + 36L;
+	public static final long HDR_INPUT_RING_SIZE = OFF_HEADER + 40L;
+	public static final long HDR_HOST_HEARTBEAT = OFF_HEADER + 48L;
+	public static final long HDR_MC_HEARTBEAT = OFF_HEADER + 56L;
+	public static final long HDR_SEQUENCE = OFF_HEADER + 64L;
+	public static final long HDR_TIMESTAMP = OFF_HEADER + 72L;
 
-	// OverlayCtl
+	// OverlayControl
 	public static final long CTL_STATE = OFF_OVERLAY_CTL + 0L;             // uint32
 	public static final long CTL_FRAMES_PUBLISHED = OFF_OVERLAY_CTL + 8L;  // uint64
+	public static final long CTL_SEQUENCE = OFF_OVERLAY_CTL + 16L;         // uint64
+	public static final long CTL_TIMESTAMP = OFF_OVERLAY_CTL + 24L;        // uint64
 	public static final int OVERLAY_FRESH = 1 << 2;
 	public static final int OVERLAY_INDEX_MASK = 0x3;
 
 	public static final int FORMAT_BGRA8 = 1;
 	public static final int OVERLAY_BOTTOM_UP = 1 << 0;
 
+	// HostState field offsets (relative to OFF_HOST_STATE)
+	public static final int HOST_SEQ = 0;
+	public static final int HOST_FLAGS = 4;
+	public static final int HOST_WORLD_ID = 8;
+	public static final int HOST_COLLISION_EPOCH = 12;
+	public static final int HOST_TIMESTAMP = 16;      // uint64
+	public static final int HOST_POS_X = 24;
+	public static final int HOST_POS_Y = 32;
+	public static final int HOST_POS_Z = 40;
+	public static final int HOST_YAW = 48;
+	public static final int HOST_PITCH = 52;
+	public static final int HOST_ROLL = 56;
+	public static final int HOST_EYE_HEIGHT = 60;
+	public static final int HOST_UNITS_PER_BLOCK = 64;
+	public static final int HOST_TELEPORT_SEQ = 68;
+	public static final int HOST_CAMERA_MODE = 72;
+	public static final int HOST_VIEWPORT_W = 76;
+	public static final int HOST_VIEWPORT_H = 80;
+
+	// McState field offsets (relative to OFF_MC_STATE)
+	public static final int MC_SEQ = 0;
+	public static final int MC_FLAGS = 4;
+	public static final int MC_TIMESTAMP = 8;         // uint64
+	public static final int MC_X = 16;
+	public static final int MC_Y = 24;
+	public static final int MC_Z = 32;
+	public static final int MC_PREV_X = 40;
+	public static final int MC_PREV_Y = 48;
+	public static final int MC_PREV_Z = 56;
+	public static final int MC_CUR_X = 64;
+	public static final int MC_CUR_Y = 72;
+	public static final int MC_CUR_Z = 80;
+	public static final int MC_YAW = 88;
+	public static final int MC_PITCH = 92;
+	public static final int MC_EYE_HEIGHT = 96;
+	public static final int MC_FOV_DEG = 100;
+	public static final int MC_TICK_MS = 104;
+	public static final int MC_CAMERA_MODE = 108;
+	public static final int MC_CAMERA_DISTANCE = 112;
+	public static final int MC_FRAME_COUNTER = 120;   // uint64
+	public static final int MC_TICK_QPC = 128;        // int64
+
 	/** Byte offset of slot {@code i}'s 0x40-byte header. */
 	public static long slotHdr(int i) {
-		return OFF_OVERLAY_HDRS + (long) i * SLOT_HDR_SIZE;
+		return OFF_OVERLAY_SLOTS + (long) i * OVERLAY_SLOT_SIZE;
 	}
 
 	/** Byte offset of slot {@code i}'s pixel slab. */
@@ -97,9 +161,10 @@ public final class Protocol {
 	}
 
 	/**
-	 * The configuration file that will be used, or {@code null} if none was found. Search order:
-	 * {@code -Dcrossmc.config} / {@code CROSSMC_CONFIG}, then {@code ./config/crossmc.properties},
-	 * then {@code %LOCALAPPDATA%/CrossMC/crossmc.properties}.
+	 * The configuration file that will be used, or {@code null} if config comes from the bundled
+	 * classpath resource / the built-in default. Search order: {@code -Dcrossmc.config} /
+	 * {@code CROSSMC_CONFIG}, then {@code ./config/crossmc.properties}, then
+	 * {@code %LOCALAPPDATA%/CrossMC/crossmc.properties}.
 	 */
 	public static Path configFile() {
 		String explicit = System.getProperty("crossmc.config");
@@ -135,23 +200,53 @@ public final class Protocol {
 		return null;
 	}
 
+	/** A human-readable description of where config comes from (file, resource or default). */
+	public static String configSource() {
+		Path file = configFile();
+
+		if (file != null) {
+			return file.toString();
+		}
+
+		if (Protocol.class.getResource(CONFIG_RESOURCE) != null) {
+			return "classpath:" + CONFIG_RESOURCE;
+		}
+
+		return "built-in default";
+	}
+
 	private static String configValue(String key) {
-		Path config = configFile();
+		Properties props = loadConfig();
+		return props == null ? null : props.getProperty(key);
+	}
 
-		if (config == null) {
-			return null;
+	private static Properties loadConfig() {
+		Path file = configFile();
+
+		if (file != null) {
+			try (InputStream in = Files.newInputStream(file)) {
+				Properties props = new Properties();
+				props.load(in);
+				return props;
+			} catch (IOException e) {
+				System.err.println("[CrossMC] failed to read config " + file + ": " + e);
+				return null;
+			}
 		}
 
-		Properties props = new Properties();
+		// Bundled default (the mod jar ships config/crossmc.properties as /crossmc.properties).
+		try (InputStream in = Protocol.class.getResourceAsStream(CONFIG_RESOURCE)) {
+			if (in == null) {
+				return null;
+			}
 
-		try (InputStream in = Files.newInputStream(config)) {
+			Properties props = new Properties();
 			props.load(in);
+			return props;
 		} catch (IOException e) {
-			System.err.println("[CrossMC] failed to read config " + config + ": " + e);
+			System.err.println("[CrossMC] failed to read bundled config: " + e);
 			return null;
 		}
-
-		return props.getProperty(key);
 	}
 
 	/** Expands {@code %VAR%} placeholders and a leading {@code ~}, then normalises to absolute. */

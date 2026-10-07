@@ -8,12 +8,13 @@ import java.util.Arrays;
 /**
  * Standalone verification of the Java binding, without Minecraft or the host.
  *
- * <p>It exercises the real file-backed mapping: header init, triple-buffer publish/acquire,
- * slot headers and pixel copy. Run: {@code java dev.crossmc.bridge.ShmSelfTest}.
+ * <p>It exercises the real file-backed mapping: header init, triple-buffer publish/acquire, slot
+ * headers and pixel copy, plus HostState/McState seqlock round-trips. Run:
+ * {@code java dev.crossmc.bridge.ShmSelfTest}.
  */
 public final class ShmSelfTest {
 	public static void main(String[] args) throws Exception {
-		System.out.println("config:  " + Protocol.configFile());
+		System.out.println("config:  " + Protocol.configSource());
 		System.out.println("mapping: " + Protocol.mappingPath());
 
 		Path path = Protocol.mappingPath();
@@ -39,6 +40,8 @@ public final class ShmSelfTest {
 				check(slotA >= 0, "first frame acquired");
 				check(reader.slotWidth(slotA) == 4 && reader.slotHeight(slotA) == 2, "frame size A");
 				check(reader.slotFormat(slotA) == Protocol.FORMAT_BGRA8, "format A");
+				check(reader.slotBufferIndex(slotA) == slotA, "buffer index A matches the slot");
+				check(reader.slotSequence(slotA) > 0, "slot sequence A stamped");
 				byte[] gotA = new byte[4 * 2 * 4];
 				reader.readPixels(slotA, gotA);
 				check(Arrays.equals(a, gotA), "pixels A round-trip");
@@ -66,6 +69,57 @@ public final class ShmSelfTest {
 				check(reader.slotFlags(slotC) == Protocol.OVERLAY_BOTTOM_UP, "direct frame bottom-up flag");
 
 				check(reader.acquire() == -1, "no fresh frame after consuming");
+
+				// ---- seqlock state round-trips (host -> MC, MC -> host) ----
+				HostState host = new HostState();
+				host.flags = HostState.IN_GAME;
+				host.worldId = 7;
+				host.timestampMs = 123456789L;
+				host.posX = 1.5;
+				host.posY = 64.25;
+				host.posZ = -13.75;
+				host.yaw = 90f;
+				host.pitch = -12.5f;
+				host.roll = 3f;
+				host.unitsPerBlock = 1.0f;
+				host.teleportSeq = 2;
+				host.viewportW = 1920;
+				host.viewportH = 1080;
+				writer.writeHostState(host);
+
+				HostState hostRead = reader.readHostState();
+				check(hostRead.flags == host.flags && hostRead.worldId == host.worldId, "HostState flags/world");
+				check(Double.compare(hostRead.posX, host.posX) == 0
+						&& Double.compare(hostRead.posY, host.posY) == 0
+						&& Double.compare(hostRead.posZ, host.posZ) == 0, "HostState position");
+				check(hostRead.yaw == host.yaw && hostRead.pitch == host.pitch && hostRead.roll == host.roll,
+						"HostState rotation (incl. roll)");
+				check(hostRead.timestampMs == host.timestampMs, "HostState timestamp");
+
+				McState mc = new McState();
+				mc.flags = McState.IN_WORLD | McState.ON_GROUND;
+				mc.timestampMs = 987654321L;
+				mc.x = -0.5;
+				mc.y = 72.0;
+				mc.z = 1024.125;
+				mc.prevY = 71.9;
+				mc.curY = 72.0;
+				mc.yaw = 180f;
+				mc.pitch = 45f;
+				mc.eyeHeight = 1.62f;
+				mc.fovDeg = 70f;
+				mc.tickMs = 50f;
+				mc.frameCounter = 42L;
+				writer.writeMcState(mc);
+
+				McState mcRead = reader.readMcState();
+				check(mcRead.flags == mc.flags, "McState flags");
+				check(Double.compare(mcRead.x, mc.x) == 0
+						&& Double.compare(mcRead.z, mc.z) == 0, "McState position");
+				check(mcRead.prevY == mc.prevY && Double.compare(mcRead.curY, mc.curY) == 0, "McState tick echo");
+				check(mcRead.yaw == mc.yaw && mcRead.pitch == mc.pitch, "McState rotation");
+				check(mcRead.frameCounter == mc.frameCounter, "McState frame counter");
+				check(mcRead.timestampMs == mc.timestampMs, "McState timestamp");
 			}
 		}
 

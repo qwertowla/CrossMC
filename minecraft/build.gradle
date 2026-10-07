@@ -13,8 +13,10 @@ loom {
 	}
 }
 
-// The Java binding lives in ../bindings/java. For the Phase 1 scaffold it is compiled as part
-// of this mod; promote it to a proper subproject + nested jar later.
+// The Java binding lives in ../bindings/java. It is a plain library (not a Fabric mod), so its
+// classes are compiled straight into the mod jar — that is how a non-mod library is shipped in a
+// Fabric mod (nested "jars" are only loaded for actual mods). The binding also has its own
+// standalone Gradle build (bindings/java) for independent building and testing.
 sourceSets {
 	main {
 		java {
@@ -37,6 +39,10 @@ processResources {
 	filesMatching("fabric.mod.json") {
 		expand "version": version
 	}
+
+	// Ship the canonical config as /crossmc.properties so a default is always available at
+	// runtime; a user file under config/crossmc.properties (or CROSSMC_CONFIG) overrides it.
+	from('../config/crossmc.properties')
 }
 
 tasks.withType(JavaCompile).configureEach {
