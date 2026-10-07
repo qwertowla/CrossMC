@@ -46,7 +46,7 @@ Design choices:
 Loom 1.18.2 requires the Gradle JVM to be **JDK ≥ 25**; the mod targets **Java 21**:
 
 ```powershell
-$env:JAVA_HOME='C:\Program Files\Microsoft\jdk-25.0.4.101-hotspot'
+$env:JAVA_HOME='<path to a JDK 25 installation>'
 $env:Path="$env:JAVA_HOME\bin;$env:Path"
 Set-Location minecraft
 .\gradlew.bat build --no-daemon --console=plain

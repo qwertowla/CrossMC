@@ -43,7 +43,8 @@ CrossMC/
 │  ├─ PORTING.md
 │  └─ ROADMAP.md
 ├─ LICENSE
-└─ README.md
+├─ README.md
+└─ README_ZH.md
 ```
 
 新宿主以 `hosts/<游戏>/`（例如 `hosts/EldenRing/`）加入，**不是**分支，**也不是**独立仓库。
@@ -95,8 +96,8 @@ Phase 0/1 固定：**仅 Windows**、**Minecraft 1.21.1 + Fabric**、**文件后
 
 更早的实验在仓库之外，**作为原型保留**：
 
-- `C:\Users\21310\Documents\HowToFishMC`（BepInEx 插件 + UDP）
-- `C:\Users\21310\Documents\HowToFishMC-Fabric`（Fabric 模组 + HUD）
+- `HowToFishMC` 原型（BepInEx 插件 + UDP）
+- `HowToFishMC-Fabric` 原型（Fabric 模组 + HUD）
 
 它们不会被整体迁移进 CrossMC；只把已验证的事实（玩家 / 相机访问、坐标映射）作为参考带过来。
 

@@ -43,7 +43,8 @@ CrossMC/
 │  ├─ PORTING.md
 │  └─ ROADMAP.md
 ├─ LICENSE
-└─ README.md
+├─ README.md
+└─ README_ZH.md
 ```
 
 New hosts are added as `hosts/<Game>/` (e.g. `hosts/EldenRing/`), **not** as branches and **not**
@@ -102,8 +103,8 @@ See `docs/ARCHITECTURE.md` for what is borrowed conceptually and the licence/att
 
 The earlier experiments live outside this repo and are **kept as prototypes**:
 
-- `C:\Users\21310\Documents\HowToFishMC` (BepInEx plugin + UDP)
-- `C:\Users\21310\Documents\HowToFishMC-Fabric` (Fabric mod + HUD)
+- the `HowToFishMC` prototype (BepInEx plugin + UDP)
+- the `HowToFishMC-Fabric` prototype (Fabric mod + HUD)
 
 They are not migrated into CrossMC wholesale; only verified facts (player/camera access,
 coordinate mapping) are carried over as reference.

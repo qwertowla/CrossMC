@@ -26,8 +26,8 @@ Thin Java runtime over the CrossMC shared memory, used by the Minecraft Fabric m
 ## Run the self-test
 
 ```powershell
-$j21='C:\Users\21310\AppData\Roaming\.minecraft\runtime\java-runtime-delta'
-$proj='C:\Users\21310\Documents\CrossMC\CrossMC\bindings\java'
+$j21="$env:APPDATA\.minecraft\runtime\java-runtime-delta"   # a JDK 21 with javac
+$proj=(Get-Location).Path                                     # this bindings/java directory
 & "$j21\bin\javac.exe" --release 21 -d "$proj\build-selftest" `
   "$proj\src\main\java\dev\crossmc\bridge\Protocol.java" `
   "$proj\src\main\java\dev\crossmc\bridge\BridgeMemory.java" `
