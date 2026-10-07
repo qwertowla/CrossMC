@@ -46,6 +46,8 @@ CrossMC/
 ├─ minecraft/                     # Fabric mod (mostly game-independent)
 ├─ hosts/
 │  └─ HowToFish/                  # first host adapter (game-specific)
+├─ config/
+│  └─ crossmc.properties          # configuration (shared-memory path etc.)
 ├─ docs/
 │  ├─ ARCHITECTURE.md
 │  ├─ PORTING.md
@@ -60,6 +62,21 @@ as separate repositories.
 
 `bindings/cpp/` is intentionally **not created** yet — it will be added only when a native
 (non-managed) host game is actually ported.
+
+---
+
+## Configuration
+
+`config/crossmc.properties` controls where the shared memory lives (`mapping.path`). Both processes
+must resolve the same absolute file. The value supports `%VAR%` placeholders and a leading `~`, e.g.
+`%LOCALAPPDATA%/CrossMC/bridge_v1.bin`.
+
+The config file is found in this order (first match wins):
+
+1. `-Dcrossmc.config=<path>` (JVM) or `CROSSMC_CONFIG=<path>` (environment);
+2. `./config/crossmc.properties` (relative to the working directory);
+3. `%LOCALAPPDATA%/CrossMC/crossmc.properties` (user-level override);
+4. the built-in default.
 
 ---
 

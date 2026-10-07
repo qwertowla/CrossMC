@@ -33,7 +33,8 @@ namespace crossmc::proto
 	// "CMCB" (CrossMC Bridge) read as bytes C,M,C,B.
 	inline constexpr std::uint32_t kMagic   = 0x42434D43u;  // little-endian of 'C','M','C','B'
 	inline constexpr std::uint32_t kVersion = 1;
-	// File-backed mapping, relative to %LOCALAPPDATA%. Both sides must resolve it identically.
+	// Default file-backed mapping (relative to %LOCALAPPDATA%). The path is configurable via
+	// config/crossmc.properties -> mapping.path; both processes must resolve the same absolute file.
 	inline constexpr wchar_t       kMappingSubPath[] = L"CrossMC\\bridge_v1.bin";
 
 	// ---- frame geometry (v1 hard cap; pages are committed lazily by the OS) -------------

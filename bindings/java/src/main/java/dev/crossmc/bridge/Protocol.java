@@ -1,7 +1,13 @@
 package dev.crossmc.bridge;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Properties;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Mirror of {@code protocol/bridge_protocol.h}. Keep offsets, sizes and constants identical
@@ -21,6 +27,13 @@ public final class Protocol {
 
 	public static final String MAPPING_SUBDIR = "CrossMC";
 	public static final String MAPPING_FILE = "bridge_v1.bin";
+
+	// ---- configuration (see config/crossmc.properties) ---------------------------------
+	public static final String CONFIG_DIR = "config";
+	public static final String CONFIG_FILE = "crossmc.properties";
+	public static final String KEY_MAPPING_PATH = "mapping.path";
+	public static final String DEFAULT_MAPPING_PATH =
+			"%LOCALAPPDATA%/" + MAPPING_SUBDIR + "/" + MAPPING_FILE;
 
 	public static final int MAX_FRAME_W = 3840;
 	public static final int MAX_FRAME_H = 2160;
@@ -69,14 +82,105 @@ public final class Protocol {
 		return OFF_FRAMES + (long) i * FRAME_SLOT_BYTES;
 	}
 
-	/** Resolves the shared file the same way on both sides. */
+	/**
+	 * Resolves the shared-memory file from the configuration ({@code mapping.path}), falling back
+	 * to {@link #DEFAULT_MAPPING_PATH}. Both processes must resolve the same absolute path.
+	 */
 	public static Path mappingPath() {
-		String base = System.getenv("LOCALAPPDATA");
+		String raw = configValue(KEY_MAPPING_PATH);
 
-		if (base == null || base.isEmpty()) {
-			base = System.getProperty("java.io.tmpdir");
+		if (raw == null || raw.trim().isEmpty()) {
+			raw = DEFAULT_MAPPING_PATH;
 		}
 
-		return Paths.get(base, MAPPING_SUBDIR, MAPPING_FILE);
+		return expand(raw.trim());
+	}
+
+	/**
+	 * The configuration file that will be used, or {@code null} if none was found. Search order:
+	 * {@code -Dcrossmc.config} / {@code CROSSMC_CONFIG}, then {@code ./config/crossmc.properties},
+	 * then {@code %LOCALAPPDATA%/CrossMC/crossmc.properties}.
+	 */
+	public static Path configFile() {
+		String explicit = System.getProperty("crossmc.config");
+
+		if (explicit == null || explicit.isEmpty()) {
+			explicit = System.getenv("CROSSMC_CONFIG");
+		}
+
+		if (explicit != null && !explicit.isEmpty()) {
+			Path p = Paths.get(explicit);
+
+			if (Files.isRegularFile(p)) {
+				return p;
+			}
+		}
+
+		Path local = Paths.get(CONFIG_DIR, CONFIG_FILE);
+
+		if (Files.isRegularFile(local)) {
+			return local;
+		}
+
+		String base = System.getenv("LOCALAPPDATA");
+
+		if (base != null && !base.isEmpty()) {
+			Path userLevel = Paths.get(base, MAPPING_SUBDIR, CONFIG_FILE);
+
+			if (Files.isRegularFile(userLevel)) {
+				return userLevel;
+			}
+		}
+
+		return null;
+	}
+
+	private static String configValue(String key) {
+		Path config = configFile();
+
+		if (config == null) {
+			return null;
+		}
+
+		Properties props = new Properties();
+
+		try (InputStream in = Files.newInputStream(config)) {
+			props.load(in);
+		} catch (IOException e) {
+			System.err.println("[CrossMC] failed to read config " + config + ": " + e);
+			return null;
+		}
+
+		return props.getProperty(key);
+	}
+
+	/** Expands {@code %VAR%} placeholders and a leading {@code ~}, then normalises to absolute. */
+	private static Path expand(String raw) {
+		String value = raw;
+
+		if (value.startsWith("~")) {
+			value = System.getProperty("user.home") + value.substring(1);
+		}
+
+		Matcher matcher = Pattern.compile("%([^%]+)%").matcher(value);
+		StringBuilder out = new StringBuilder();
+
+		while (matcher.find()) {
+			String name = matcher.group(1);
+			String replacement = System.getenv(name);
+
+			if (replacement == null || replacement.isEmpty()) {
+				if ("LOCALAPPDATA".equalsIgnoreCase(name) || "APPDATA".equalsIgnoreCase(name)) {
+					replacement = System.getProperty("java.io.tmpdir");
+				} else {
+					replacement = System.getProperty(name, matcher.group(0));
+				}
+			}
+
+			matcher.appendReplacement(out, Matcher.quoteReplacement(replacement));
+		}
+
+		matcher.appendTail(out);
+		return Paths.get(out.toString()).toAbsolutePath().normalize();
 	}
 }

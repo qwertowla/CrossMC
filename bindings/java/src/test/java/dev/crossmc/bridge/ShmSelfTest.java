@@ -13,6 +13,9 @@ import java.util.Arrays;
  */
 public final class ShmSelfTest {
 	public static void main(String[] args) throws Exception {
+		System.out.println("config:  " + Protocol.configFile());
+		System.out.println("mapping: " + Protocol.mappingPath());
+
 		Path path = Protocol.mappingPath();
 		Files.deleteIfExists(path);
 

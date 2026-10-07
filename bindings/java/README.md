@@ -9,6 +9,9 @@ Thin Java runtime over the CrossMC shared memory, used by the Minecraft Fabric m
 - `dev.crossmc.bridge.Protocol` — mirrors `protocol/bridge_protocol.h`: magic, version, region
   offsets, header/slot field offsets and constants. Keep it identical to the C header and the C#
   binding; bump `VERSION` in all three together.
+  `Protocol.mappingPath()` resolves the shared file from `config/crossmc.properties`
+  (`mapping.path`), with `-Dcrossmc.config` / `CROSSMC_CONFIG` overrides and a built-in default
+  (see the main README "Configuration").
 - `dev.crossmc.bridge.BridgeMemory` — opens the file-backed mapping
   `%LOCALAPPDATA%\CrossMC\bridge_v1.bin`, reads/writes the header and heartbeats, and implements the
   lock-free **triple buffer**:

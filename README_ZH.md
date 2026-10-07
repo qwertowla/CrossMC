@@ -43,6 +43,8 @@ CrossMC/
 ├─ minecraft/                     # Fabric 模组（基本与游戏无关）
 ├─ hosts/
 │  └─ HowToFish/                  # 第一个宿主适配器（游戏相关）
+├─ config/
+│  └─ crossmc.properties          # 配置（共享内存路径等）
 ├─ docs/
 │  ├─ ARCHITECTURE.md
 │  ├─ PORTING.md
@@ -55,6 +57,20 @@ CrossMC/
 新宿主以 `hosts/<游戏>/`（例如 `hosts/EldenRing/`）加入，**不是**分支，**也不是**独立仓库。
 
 `bindings/cpp/` 暂**不创建**——等真正要移植第一个原生（非托管）宿主时再加。
+
+---
+
+## 配置
+
+`config/crossmc.properties` 控制共享内存的位置（`mapping.path`）。两个进程必须解析到同一个绝对路径。
+值支持 `%VAR%` 占位符与前导 `~`，例如 `%LOCALAPPDATA%/CrossMC/bridge_v1.bin`。
+
+配置文件的查找顺序（先匹配者优先）：
+
+1. `-Dcrossmc.config=<路径>`（JVM）或 `CROSSMC_CONFIG=<路径>`（环境变量）；
+2. `./config/crossmc.properties`（相对于工作目录）；
+3. `%LOCALAPPDATA%/CrossMC/crossmc.properties`（用户级覆盖）；
+4. 内置默认值。
 
 ---
 

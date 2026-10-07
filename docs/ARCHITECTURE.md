@@ -146,7 +146,7 @@ camera sync, input, terrain, entities, combat, GPU sharing, frame lockstep.
 | Platform | Windows only (no macOS/Linux/CrossOver) |
 | Minecraft | 1.21.1 + Fabric (Loader 0.19.5, Fabric API 0.116.17+1.21.1) |
 | Host | How to Fish only (Unity 6 / Mono / BepInEx 5) |
-| Transport | File-backed shared memory (`%LOCALAPPDATA%\CrossMC\bridge_v1.bin`) |
+| Transport | File-backed shared memory, path from `config/crossmc.properties` `mapping.path` (default `%LOCALAPPDATA%\CrossMC\bridge_v1.bin`) |
 | Frame transfer | CPU readback (no GPU interop yet) |
 | Frame buffering | Triple buffer |
 | State sync | Seqlock latest-value slots |
