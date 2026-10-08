@@ -36,4 +36,5 @@ public final class McState {
 	public static final int DEAD = 1 << 5;
 	public static final int SWIMMING = 1 << 6;
 	public static final int FLYING = 1 << 7;
+	public static final int BOOTSTRAP_DONE = 1 << 8;
 }

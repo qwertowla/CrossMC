@@ -44,6 +44,8 @@ public class CrossMcMinecraftClient implements ClientModInitializer {
 			FrameExporter.register();
 
 			ClientTickEvents.END_CLIENT_TICK.register(client -> {
+				// Run bootstrap first so McStatePublisher reports BOOTSTRAP_DONE after the align.
+				PlayerBootstrapManager.tick(client, memory);
 				McStatePublisher.tick(client);
 				HostInputConsumer.get().tick(client, memory);
 
@@ -53,7 +55,7 @@ public class CrossMcMinecraftClient implements ClientModInitializer {
 				}
 			});
 
-			CrossMcMinecraft.LOGGER.info("CrossMC bridge ready: {}", Protocol.mappingPath());
+			CrossMcMinecraft.LOGGER.info("CrossMC bridge ready: {} (player-bootstrap build; PlayerBootstrapManager active)", Protocol.mappingPath());
 		} catch (Exception e) {
 			CrossMcMinecraft.LOGGER.error("CrossMC failed to open shared memory at {}", Protocol.mappingPath(), e);
 		}

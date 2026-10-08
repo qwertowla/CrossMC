@@ -3,6 +3,10 @@ namespace CrossMC.Bridge
     /// <summary>Mirror of <c>crossmc_host_state</c>. Host -> Minecraft.</summary>
     public sealed class HostState
     {
+        // flag bits (CROSSMC_HOST_*)
+        public const int InGame = 1 << 0;
+        public const int Bootstrap = 1 << 3;
+
         public int Flags;
         public int WorldId;
         public int CollisionEpoch;
@@ -23,6 +27,7 @@ namespace CrossMC.Bridge
         public const int InWorld = 1 << 0;
         public const int ScreenOpen = 1 << 1;
         public const int OnGround = 1 << 2;
+        public const int BootstrapDone = 1 << 8;
 
         public int Flags;
         public long TimestampMs;

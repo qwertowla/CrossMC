@@ -27,4 +27,5 @@ public final class HostState {
 	public static final int IN_GAME = 1 << 0;
 	public static final int MENU_OPEN = 1 << 1;
 	public static final int LOADING = 1 << 2;
+	public static final int BOOTSTRAP = 1 << 3;
 }

@@ -144,6 +144,10 @@ CROSSMC_STATIC_ASSERT(sizeof(Header) == 0x50, "Header size");
 #define CROSSMC_HOST_IN_GAME   (1u << 0)
 #define CROSSMC_HOST_MENU_OPEN (1u << 1)
 #define CROSSMC_HOST_LOADING   (1u << 2)
+/* Host requests a one-time player bootstrap: align the Minecraft player to HostState.pos (the host
+ * avatar mapped to MC space) when a new Minecraft world/session becomes ready. `teleportSeq` is the
+ * generation. After CROSSMC_MC_BOOTSTRAP_DONE, normal MC -> host following resumes. Generic. */
+#define CROSSMC_HOST_BOOTSTRAP (1u << 3)
 
 typedef struct crossmc_host_state
 {
@@ -181,6 +185,8 @@ CROSSMC_STATIC_ASSERT(sizeof(HostState) <= 0x100, "HostState must fit its region
 #define CROSSMC_MC_DEAD        (1u << 5)
 #define CROSSMC_MC_SWIMMING    (1u << 6)
 #define CROSSMC_MC_FLYING      (1u << 7)
+/* Minecraft confirms the one-time host bootstrap is done (player aligned, world ready). */
+#define CROSSMC_MC_BOOTSTRAP_DONE (1u << 8)
 
 typedef struct crossmc_mc_state
 {

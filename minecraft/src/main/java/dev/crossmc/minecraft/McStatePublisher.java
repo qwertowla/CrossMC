@@ -65,6 +65,10 @@ public final class McStatePublisher {
 			flags |= McState.FLYING;
 		}
 
+		if (PlayerBootstrapManager.isBootstrapped()) {
+			flags |= McState.BOOTSTRAP_DONE;
+		}
+
 		STATE.flags = flags;
 		STATE.timestampMs = System.currentTimeMillis();
 		STATE.x = pos.x;
