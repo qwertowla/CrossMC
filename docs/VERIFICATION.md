@@ -27,7 +27,8 @@ dotnet build -c Release
 # -> bin\Release\netstandard2.1\CrossMC.Bindings.dll
 
 # 2) HowToFishMC 宿主适配器（独立仓库，引用 ..\CrossMC 的绑定）
-cd ..\..\HowToFishMC
+#    当前目录是 <容器>\CrossMC\bindings\csharp，因此上三级到 <容器>
+cd ..\..\..\HowToFishMC
 dotnet build -c Release
 # -> bin\Release\CrossMC.HowToFish.dll
 ```
