@@ -32,6 +32,7 @@ public final class PlayerBootstrapManager {
 	private static double targetY;
 	private static double targetZ;
 	private static long lastLogMs;
+	private static boolean loggedFirstAttempt;
 
 	private PlayerBootstrapManager() {
 	}
@@ -89,13 +90,7 @@ public final class PlayerBootstrapManager {
 			targetZ = host.posZ;
 			pending = true;
 			done = false;
-			double fromX = client.player.getX();
-			double fromY = client.player.getY();
-			double fromZ = client.player.getZ();
-			teleport(client, targetX, targetY, targetZ);
-			log("TELEPORT from (" + fmt(fromX) + ", " + fmt(fromY) + ", " + fmt(fromZ)
-					+ ") to (" + fmt(targetX) + ", " + fmt(targetY) + ", " + fmt(targetZ)
-					+ ") seq=" + host.teleportSeq);
+			loggedFirstAttempt = false;
 		}
 
 		if (pending) {
@@ -105,12 +100,27 @@ public final class PlayerBootstrapManager {
 			double dz = client.player.getZ() - targetZ;
 			double distance = Math.sqrt(dx * dx + dy * dy + dz * dz);
 
-			if (distance < CONFIRM_DISTANCE) {
+			if (distance >= CONFIRM_DISTANCE) {
+				// (Re)issue the teleport until we actually arrive. The integrated-server player may not
+				// exist yet on the first ticks after a world load; retrying self-heals that and any
+				// teleport the server did not apply.
+				double fromX = client.player.getX();
+				double fromY = client.player.getY();
+				double fromZ = client.player.getZ();
+				teleport(client, targetX, targetY, targetZ);
+
+				if (!loggedFirstAttempt) {
+					loggedFirstAttempt = true;
+					log("TELEPORT from (" + fmt(fromX) + ", " + fmt(fromY) + ", " + fmt(fromZ)
+							+ ") to (" + fmt(targetX) + ", " + fmt(targetY) + ", " + fmt(targetZ)
+							+ ") seq=" + handledSeq);
+				} else {
+					logThrottled("waiting confirmation distance=" + fmt(distance));
+				}
+			} else {
 				pending = false;
 				done = true;
 				log("completed (distance=" + fmt(distance) + ") — player authority is Minecraft");
-			} else {
-				logThrottled("waiting confirmation distance=" + fmt(distance));
 			}
 		}
 	}
