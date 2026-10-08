@@ -3,13 +3,18 @@
 The Minecraft side of CrossMC: a **Fabric client mod** (Minecraft 1.21.1, Fabric Loader 0.19.5,
 Fabric API 0.116.17+1.21.1). Mostly game-independent across hosts.
 
-**Status: Phase 1 frame path implemented. Player/camera/input/depth not yet.**
+**Status: frame, state, collision, entity and damage paths implemented (build-verified, not yet
+verified in game).** Input is consumed into a held-key state but not yet applied to movement.
 
 ## Responsibility
 
 - Produce frames: render target → CPU readback → write into a triple-buffer slot → publish.
-- Later: publish `McState` (position/rotation/eye/tick echo), consume `HostState`.
-- Later: consume input from the host (Phase 3).
+- Publish `McState` — the **authoritative** Minecraft player state (position/rotation/flags).
+- Build host-collision proxies and host-entity proxies; capture native damage.
+- Consume `InputRing` from the host (`HostInputConsumer`) — the Host → Minecraft player channel.
+
+The Minecraft player is authoritative: the mod **never** reads `HostState` to move the player
+(`HostState` carries host environment/avatar info only).
 
 ## Implemented
 
