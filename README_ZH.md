@@ -2,49 +2,41 @@
 
 [English](README.md) | **中文**
 
-> ⚠️ **本项目尚未完成（开发中）。** 协议布局、bindings 与仓库结构均不稳定，可能随时调整。
+> ⚠️ **开发中。** 协议、bindings 与仓库结构均不稳定，可能随时调整。
 
-**CrossMC** 是一个通用的、与具体游戏无关的**跨进程桥接框架**：把 **Minecraft（Java 版，Fabric）**
-与一个**独立的宿主游戏**连接起来。两个进程通过共享内存交换渲染帧、状态与输入：Minecraft 作为渲染 /
-工具侧，宿主游戏负责显示与合成。
+**CrossMC** 是一个通用的、与具体游戏无关的**跨进程桥接框架**，连接 **Minecraft（Java 版，Fabric）**
+与一个**独立的宿主游戏**。两个进程通过共享内存交换渲染帧、状态与事件。Minecraft 始终是**逻辑/规则侧**
+（玩家、方块、实体规则）；宿主游戏是**世界/表现侧**；桥只负责在两者之间**翻译**——不重写任何一个游戏。
 
-第一个宿主实现是 **HowToFishMC** —— 一个独立的同级仓库：它把 Minecraft 渲染出的画面合成进
-**How to Fish**（Unity 6 / Mono / BepInEx）。
+第一个宿主适配器是 **HowToFishMC**（独立的同级仓库）：它桥接 **How to Fish**（Unity 6 / Mono /
+BepInEx）。以后接入更多游戏时各自新建同级仓库（`EldenRingMC` 等）。
 
-**CrossMC 目前主要面向 Minecraft 1.21.1 + Fabric**，这是现阶段唯一支持的 Minecraft 环境。
-
-> **状态：Phase 0 完成。Phase 1 的 Minecraft 取帧端已实现，宿主消费端是下一步。**
-> 尚未做玩家 / 相机 / 输入 / 深度同步。
-
-长期形态：
+目前主要面向 **Minecraft 1.21.1 + Fabric**，这是现阶段唯一支持的 Minecraft 环境。
 
 ```text
-                ┌─ HowToFish        （第一个宿主适配器，目前唯一）
-Minecraft ─ Core ─┤─ <未来的宿主>
-                └─ <未来的宿主>
+                    ┌─ HowToFishMC   （第一个宿主适配器，独立仓库）
+Minecraft ──────────┼─ <未来的宿主>   每个宿主是依赖 CrossMC 的独立仓库
+  (CrossMC)         └─ <未来的宿主>
 ```
-
-**不重写两个游戏。** Minecraft 跑自己的游戏逻辑；宿主游戏跑自己的世界 / 渲染器。桥只负责在两者之间
-做「翻译」。
 
 ---
 
 ## 目录结构
 
-框架单独一个仓库。框架（协议 + bindings + Minecraft 模组）与游戏无关；每个宿主适配器是**独立的同级
-仓库**（例如 `HowToFishMC`），是唯一的游戏相关代码。
+CrossMC 是**框架**仓库。每个宿主适配器都是**独立的同级仓库**，也是唯一存放游戏相关代码的地方。
 
 ```text
 CrossMC/
-├─ protocol/bridge_protocol.h     # 共享内存布局的唯一真相源
+├─ protocol/bridge_protocol.h     # 共享内存布局的唯一真相源（v4）
 ├─ bindings/
-│  ├─ java/                       # Minecraft 模组使用的薄运行时（已实现）
-│  └─ csharp/                     # C# 宿主使用的薄运行时（占位）
-├─ minecraft/                     # Fabric 模组（基本与游戏无关）
+│  ├─ java/                       # Minecraft 模组使用的薄运行时
+│  └─ csharp/                     # C# 宿主使用的薄运行时
+├─ minecraft/                     # Fabric 客户端模组（与游戏无关）
 ├─ config/
 │  └─ crossmc.properties          # 配置（共享内存路径等）
-├─ tools/TestHost/                # 极简开发用 Host，验证协议（无 Unity）
+├─ tools/TestHost/                # 极简 dotnet 测试 Host（无 Unity）
 ├─ docs/
+│  ├─ PROTOCOL.md                 # 语义：坐标、身份、State/Event、能力
 │  ├─ ARCHITECTURE.md
 │  ├─ PORTING.md
 │  ├─ ROADMAP.md
@@ -54,10 +46,22 @@ CrossMC/
 └─ README_ZH.md
 ```
 
-每个宿主适配器是独立的同级仓库（例如 `HowToFishMC`，以后 `EldenRingMC`），依赖本仓库。CrossMC 本身
-负责全部与游戏无关的逻辑。
-
 `bindings/cpp/` 暂**不创建**——等真正要移植第一个原生（非托管）宿主时再加。
+
+---
+
+## 框架提供什么
+
+- **协议**（`protocol/bridge_protocol.h`，v4）——C-compatible 字节布局：能力位、心跳、
+  `HostState`/`McState` seqlock、overlay **三缓冲**、`ColliderTable`（id + revision + 生命周期）、
+  带稳定 **`CrossEntityId`** 的 `EntityTable`、原生伤害 `DamageRing`、`InputRing`，以及预留的
+  `DepthFrame`/`BlockEditRing`。详见 `docs/PROTOCOL.md`。
+- **Bindings**——`bindings/java`（Minecraft 模组用）与 `bindings/csharp`（C# 宿主用）：文件后备映射、
+  原子操作、seqlock、三缓冲、表与环的访问、能力/存活辅助。两端都镜像头文件；改动时三处一起升 `VERSION`。
+- **Minecraft 模组**——取帧（`FrameExporter`）、发布 `McState`、宿主碰撞代理（体素化，经
+  `World#getBlockState` 注入）、宿主实体的隐藏代理实体、原生伤害捕获——全部走共享内存协议，不含宿主专属代码。
+- **测试 Host**（`tools/TestHost`）——极简 .NET 控制台 Host，无需 Minecraft/Unity 即可验证共享内存、
+  能力、序号、实体生命周期、State/Event 与断开。
 
 ---
 
@@ -78,51 +82,20 @@ CrossMC/
 
 ---
 
-## 核心 = 协议 + bindings（不是一个进程内共享库）
+## 能力与状态
 
-两个进程、不同语言、不同地址空间。真正共享的是：
+| 能力 | 协议 | Minecraft 侧 | 宿主适配器 |
+|---|---|---|---|
+| Frame | ✅ | ✅ 生产者 | ✅（HowToFishMC overlay） |
+| State（`HostState`/`McState`） | ✅ | ✅ 发布 `McState` | ✅ 发布 `HostState` |
+| Collision（`ColliderTable`） | ✅ | ✅ 经 `World#getBlockState` 代理 | ✅ 导出 Collider |
+| Entity（`CrossEntityId`） | ✅ | ✅ 代理实体 + 伤害 | ✅ 分配 id |
+| Damage（`DamageRing`） | ✅ | ✅ 捕获原生伤害 | ✅ 施加倍率 |
+| Input（`InputRing`） | ✅ 预留 | ⛔ 尚未消费 | ⛔ 尚未产生 |
+| Depth / BlockEdit | ✅ 预留 | ⛔ | ⛔ |
 
-- `protocol/` —— 字节布局、magic、version、seqlock、三缓冲、帧格式，以及通用状态结构体；
-- `bindings/` —— 每种语言的薄运行时，负责打开映射并实现内存原语。
-
-一切游戏相关内容（玩家访问、相机 hook、渲染 / 呈现 hook、输入 hook）都放在宿主适配器里，不放进核心。
-
----
-
-## 第一个里程碑（Phase 1）
-
-```text
-Minecraft Fabric ── FrameExporter ──▶ 共享内存 ──▶ How to Fish (BepInEx) ──▶ Unity 叠加层
-```
-
-目标：Minecraft 的实时画面经文件后备共享内存传输，在 How to Fish 里显示为一个实时矩形。这一条垂直
-切片即可验证：协议、共享内存、三缓冲、帧传输、宿主合成。
-
-Phase 0/1 固定：**仅 Windows**、**Minecraft 1.21.1 + Fabric**、**文件后备共享内存**、**CPU 回读**、
-**三缓冲**、**How to Fish 作为唯一宿主**。
-
-进度：Java 绑定与 Minecraft 取帧端（`minecraft/FrameExporter`）已实现且可构建；C# 宿主消费端尚未开始。
-参见 `minecraft/README.md` 与 `docs/ROADMAP.md`。
-
----
-
-## 碰撞 / 实体 / 伤害（协议 v4）
-
-在画面链路之外，CrossMC 把两个世界互相映射，同时保持 Minecraft 作为**逻辑/规则侧**：
-
-- **宿主 Collider → Minecraft 碰撞代理。** 宿主发布 Collider 的 AABB；Minecraft 体素化后通过
-  `World#getBlockState` 把它们当作不可见实体方块返回，于是 Minecraft **原生**的碰撞、射线与方块放置
-  都能感知宿主空间（不重写规则，也绝不遮挡真实方块）。
-- **实体。** 宿主生物通过稳定宿主实体 id（`NetworkObject.ObjectId`）映射为隐藏的 Minecraft 代理实体。
-- **伤害。** 代理实体上的 Minecraft 原生伤害事件（近战、投射物、爆炸/TNT、摔落、火焰、模组）会被转发
-  给宿主，由宿主按自己的规则/倍率处理。伤害倍率只存在于宿主适配器仓库（`HowToFishMC`），绝不进 `protocol/`。
-- **身份与能力。** 稳定的 **`CrossEntityId`** 连接 Minecraft 与宿主实体；Header 携带各端的**能力位**
-  （`Frame/State/Entity/Collision/Damage/Input/…`）与心跳，使对端断开可被检测并丢弃陈旧数据。
-
-`tools/TestHost` 是一个极简的 dotnet 控制台 Host，用于在无 Unity 的情况下验证共享内存、能力、序号、
-实体生命周期、状态/事件与断开。
-
-状态：各模块均能编译；尚未实机验证。详见 `docs/PROTOCOL.md`、`docs/ARCHITECTURE.md` §9/§12 与 `docs/ROADMAP.md`。
+各模块均能编译、Java 绑定自检通过；**尚未实机验证**。详见 `docs/ROADMAP.md`、`docs/VERIFICATION.md`、
+`docs/PROTOCOL.md`。
 
 ---
 
@@ -141,8 +114,8 @@ Phase 0/1 固定：**仅 Windows**、**Minecraft 1.21.1 + Fabric**、**文件后
 
 更早的实验在仓库之外，**作为原型保留**：
 
-- `HowToFishMC` 原型（BepInEx 插件 + UDP）
-- `HowToFishMC-Fabric` 原型（Fabric 模组 + HUD）
+- 早期的 BepInEx + UDP 原型
+- Fabric + HUD 原型
 
 它们不会被整体迁移进 CrossMC；只把已验证的事实（玩家 / 相机访问、坐标映射）作为参考带过来。
 
