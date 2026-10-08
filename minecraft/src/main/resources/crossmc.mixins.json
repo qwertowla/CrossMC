@@ -1,0 +1,12 @@
+{
+	"required": true,
+	"minVersion": "0.8",
+	"package": "dev.crossmc.minecraft.mixin",
+	"compatibilityLevel": "JAVA_21",
+	"client": [
+		"WorldBlockStateMixin"
+	],
+	"injectors": {
+		"defaultRequire": 1
+	}
+}

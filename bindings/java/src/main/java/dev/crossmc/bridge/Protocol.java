@@ -23,10 +23,10 @@ public final class Protocol {
 	}
 
 	public static final int MAGIC = 0x42434D43;   // 'C','M','C','B'
-	public static final int VERSION = 2;
+	public static final int VERSION = 3;
 
 	public static final String MAPPING_SUBDIR = "CrossMC";
-	public static final String MAPPING_FILE = "bridge_v2.bin";
+	public static final String MAPPING_FILE = "bridge_v3.bin";
 
 	// ---- configuration (see config/crossmc.properties) ---------------------------------
 	public static final String CONFIG_DIR = "config";
@@ -50,6 +50,14 @@ public final class Protocol {
 	public static final long OFF_DEPTH_FRAME = 0x0400L;
 	public static final long OFF_INPUT_RING = 0x1000L;
 	public static final long OFF_INPUT_EVENTS = 0x1040L;
+	public static final long OFF_COLLIDERS = 0x20000L;
+	public static final long OFF_COLLIDER_ENTRIES = OFF_COLLIDERS + 0x20L;
+	public static final long OFF_ENTITIES = 0x40000L;
+	public static final long OFF_ENTITY_ENTRIES = OFF_ENTITIES + 0x20L;
+	public static final long OFF_DAMAGE = 0x60000L;
+	public static final long OFF_DAMAGE_ENTRIES = OFF_DAMAGE + 0x10L;
+	public static final long OFF_BLOCK_EDITS = 0x80000L;
+	public static final long OFF_BLOCK_EDIT_ENTRIES = OFF_BLOCK_EDITS + 0x10L;
 	public static final long OFF_FRAMES = 0x100000L;
 	public static final long MAPPING_BYTES = OFF_FRAMES + FRAME_SLOT_BYTES * 3L;
 
@@ -62,9 +70,49 @@ public final class Protocol {
 	public static final int INPUT_EVENT_SIZE = 0x18;
 	public static final int INPUT_RING_SIZE = 0x10;
 	public static final int DEPTH_FRAME_SIZE = 0x30;
+	public static final int COLLIDER_SIZE = 0x38;
+	public static final int COLLIDER_TABLE_SIZE = 0x20;
+	public static final int ENTITY_SIZE = 0x38;
+	public static final int ENTITY_TABLE_SIZE = 0x20;
+	public static final int DAMAGE_EVENT_SIZE = 0x40;
+	public static final int DAMAGE_RING_SIZE = 0x10;
+	public static final int BLOCK_EDIT_SIZE = 0x28;
+	public static final int BLOCK_EDIT_RING_SIZE = 0x10;
 
 	public static final int OVERLAY_SLOTS = 3;
 	public static final int INPUT_RING_ENTRIES = 2048;
+	public static final int COLLIDER_CAPACITY = 512;
+	public static final int ENTITY_CAPACITY = 512;
+	public static final int DAMAGE_CAPACITY = 1024;
+	public static final int BLOCK_EDIT_CAPACITY = 1024;
+
+	// ---- collider kinds / flags (CROSSMC_COLLIDER_*) ----
+	public static final int COLLIDER_BOX = 1;
+	public static final int COLLIDER_SPHERE = 2;
+	public static final int COLLIDER_CAPSULE = 3;
+	public static final int COLLIDER_ENABLED = 1 << 0;
+	public static final int COLLIDER_DYNAMIC = 1 << 1;
+
+	// ---- entity kinds / flags (CROSSMC_ENTITY_*) ----
+	public static final int ENTITY_CREATURE = 1;
+	public static final int ENTITY_PLAYER = 2;
+	public static final int ENTITY_ITEM = 3;
+	public static final int ENTITY_BOSS = 4;
+	public static final int ENTITY_DEAD = 1 << 0;
+	public static final int ENTITY_BOSS_FLAG = 1 << 1;
+	public static final int ENTITY_VISIBLE = 1 << 2;
+
+	// ---- damage source kinds / flags (CROSSMC_DMG_*) ----
+	public static final int DMG_GENERIC = 0;
+	public static final int DMG_PLAYER = 1;
+	public static final int DMG_MOB = 2;
+	public static final int DMG_PROJECTILE = 3;
+	public static final int DMG_EXPLOSION = 4;
+	public static final int DMG_FALL = 5;
+	public static final int DMG_FIRE = 6;
+	public static final int DMG_MAGIC = 7;
+	public static final int DMG_OTHER = 8;
+	public static final int DMG_CRITICAL = 1 << 0;
 
 	// Header field offsets
 	public static final long HDR_MAGIC = OFF_HEADER + 0L;

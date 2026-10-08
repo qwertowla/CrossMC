@@ -147,7 +147,7 @@ camera sync, input, terrain, entities, combat, GPU sharing, frame lockstep.
 | Platform | Windows only (no macOS/Linux/CrossOver) |
 | Minecraft | 1.21.1 + Fabric (Loader 0.19.5, Fabric API 0.116.17+1.21.1) |
 | Host | How to Fish only (Unity 6 / Mono / BepInEx 5) |
-| Transport | File-backed shared memory, path from `config/crossmc.properties` `mapping.path` (default `%LOCALAPPDATA%\CrossMC\bridge_v2.bin`) |
+| Transport | File-backed shared memory, path from `config/crossmc.properties` `mapping.path` (default `%LOCALAPPDATA%\CrossMC\bridge_v3.bin`) |
 | Frame transfer | CPU readback (no GPU interop yet) |
 | Frame buffering | Triple buffer |
 | State sync | Seqlock latest-value slots |
@@ -202,3 +202,57 @@ Policy:
 - Preserve any copyright/licence notices the reference projects require; do not copy code from
   licences incompatible with MIT.
 - If an upstream licence turns out to impose extra terms, add `NOTICE`/attribution later.
+
+---
+
+## 12. Cross-space mapping (protocol v3)
+
+Roles for this phase: **Minecraft is the logical/rules side; the host game is the world/presentation
+side.** Minecraft's player is the primary player; host entities map to Minecraft proxy entities;
+Minecraft's own collision/raycast/placement/damage rules keep doing the work.
+
+### 12.1 Host colliders → Minecraft collision proxies
+
+```text
+host Collider  →  ColliderTable (seqlock, MC space)  →  Minecraft voxelisation
+              →  World.getBlockState(cell) = invisible barrier  →  native collision / raycast / placement
+```
+
+- The host publishes AABBs (`Collider`, stable `id`, Box/Sphere/Capsule types) in **Minecraft
+  space**; the adapter converts from its own space (`transform.origin/scale/flip`).
+- Minecraft voxelises them into a cell set and returns a solid, invisible block state from
+  `World.getBlockState` for **client** cells that are actually air. No Minecraft rule is
+  re-implemented, and existing blocks are never hidden.
+- Consequence: client-side movement is constrained by host space using native code; the server does
+  not know the proxies, so server-authoritative correction is a later concern.
+
+### 12.2 Entity mapping
+
+```text
+host entity (FishNet NetworkObject.ObjectId)  ↔  EntityTable  ↔  Minecraft proxy entity
+```
+
+- Each host creature/boss is a hidden armor-stand proxy on the integrated server, tagged
+  `crossmc_proxy` + `crossmc_id_<hostEntityId>`.
+- `hostEntityId` is the stable key both directions. (`mcEntityId` is reserved for a future
+  write-back; resolution currently uses the entity tag.)
+
+### 12.3 Damage events (Minecraft → host)
+
+```text
+MC native damage (melee / projectile / explosion / fall / fire / modded)
+        ↓  ServerLivingEntityEvents.AFTER_DAMAGE (only proxy entities)
+DamageRing (SPSC)  →  host adapter  →  multiplier from hosts/<Game>  →  host entity effect
+```
+
+- Minecraft forwards the **real** damage event (amount, source kind, attacker, position), not an
+  explosion coordinate.
+- Multipliers and how a host entity reacts live in `hosts/<Game>` configuration, never in
+  `protocol/`.
+- Reverse direction (Minecraft blocks constraining host entities) is reserved as `BlockEditRing`.
+
+### 12.4 Status
+
+Implemented and building: protocol v3, Java + C# bindings (with tests for Java), the Minecraft
+collision/entity/damage plumbing, and the How to Fish adapter. **Not yet verified in-game**; see
+`docs/ROADMAP.md`.

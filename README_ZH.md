@@ -63,7 +63,7 @@ CrossMC/
 ## 配置
 
 `config/crossmc.properties` 控制共享内存的位置（`mapping.path`）。两个进程必须解析到同一个绝对路径。
-值支持 `%VAR%` 占位符与前导 `~`，例如 `%LOCALAPPDATA%/CrossMC/bridge_v2.bin`。
+值支持 `%VAR%` 占位符与前导 `~`，例如 `%LOCALAPPDATA%/CrossMC/bridge_v3.bin`。
 
 配置文件的查找顺序（先匹配者优先）：
 
@@ -102,6 +102,21 @@ Phase 0/1 固定：**仅 Windows**、**Minecraft 1.21.1 + Fabric**、**文件后
 
 进度：Java 绑定与 Minecraft 取帧端（`minecraft/FrameExporter`）已实现且可构建；C# 宿主消费端尚未开始。
 参见 `minecraft/README.md` 与 `docs/ROADMAP.md`。
+
+---
+
+## 碰撞 / 实体 / 伤害（协议 v3）
+
+在画面链路之外，CrossMC 把两个世界互相映射，同时保持 Minecraft 作为**逻辑/规则侧**：
+
+- **宿主 Collider → Minecraft 碰撞代理。** 宿主发布 Collider 的 AABB；Minecraft 体素化后通过
+  `World#getBlockState` 把它们当作不可见实体方块返回，于是 Minecraft **原生**的碰撞、射线与方块放置
+  都能感知宿主空间（不重写规则，也绝不遮挡真实方块）。
+- **实体。** 宿主生物通过稳定宿主实体 id（`NetworkObject.ObjectId`）映射为隐藏的 Minecraft 代理实体。
+- **伤害。** 代理实体上的 Minecraft 原生伤害事件（近战、投射物、爆炸/TNT、摔落、火焰、模组）会被转发
+  给宿主，由宿主按自己的规则/倍率处理。伤害倍率只存在于 `hosts/HowToFish`，绝不进 `protocol/`。
+
+状态：各模块均能编译；尚未实机验证。详见 `docs/ARCHITECTURE.md` §12 与 `docs/ROADMAP.md`。
 
 ---
 

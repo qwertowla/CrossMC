@@ -3,17 +3,23 @@
 	"id": "crossmc",
 	"version": "${version}",
 	"name": "CrossMC",
-	"description": "Minecraft side of the CrossMC cross-process bridge (frame producer for a host game).",
+	"description": "Minecraft side of the CrossMC cross-process bridge: frame producer, player state, collision proxies and entity/damage mapping.",
 	"authors": [
 		"CrossMC contributors"
 	],
 	"license": "MIT",
-	"environment": "client",
+	"environment": "*",
 	"entrypoints": {
+		"main": [
+			"dev.crossmc.minecraft.CrossMcMinecraft"
+		],
 		"client": [
 			"dev.crossmc.minecraft.CrossMcMinecraftClient"
 		]
 	},
+	"mixins": [
+		"crossmc.mixins.json"
+	],
 	"depends": {
 		"fabricloader": ">=0.19.5",
 		"minecraft": "~1.21.1",

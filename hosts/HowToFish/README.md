@@ -4,52 +4,70 @@ The first CrossMC **host adapter** — game: **How to Fish** (Unity 6, Mono, Fis
 
 Adapter name: **CrossMC-HowToFish**.
 
-**Status: Phase 1 consumer not started.** The Minecraft frame producer is already implemented
-(`minecraft/`); this adapter still needs the C# binding and the overlay plugin.
+**Status: implemented (Phase 1 + collision/entity/damage plumbing). Compiles with `dotnet build`;
+runtime behaviour is not yet verified in-game.**
 
 This adapter is game-specific by design. It may know about Unity, BepInEx, Harmony, `Player`,
-`Camera` and `Transform`; the CrossMC protocol and bindings must not.
+`Creature`, `Collider` and `Transform`; the CrossMC protocol and bindings must not.
 
-## Responsibility
+## What it does
 
-- Open the CrossMC shared memory (path from `config/crossmc.properties`, default
-  `%LOCALAPPDATA%\CrossMC\bridge_v2.bin`) as the frame **consumer**.
-- On the Unity main thread: upload the received BGRA frame to a Unity texture and draw it as an
-  overlay rectangle (Phase 1).
-- Later: camera/player access, input, depth, in-scene compositing.
+- Opens the shared memory as the frame **consumer** and draws the newest Minecraft frame as a
+  screen rectangle (`FrameOverlay`, IMGUI; rows are bottom-up and match Unity's texture origin).
+- Publishes the host player/camera as `HostState` (`Player.LocalPlayer`, `player.Transform.position`,
+  `player.CamObject.eulerAngles`).
+- Publishes host world colliders (`Physics.OverlapSphereNonAlloc` around the player, AABBs to MC
+  space) so Minecraft can build collision proxies.
+- Publishes host creatures (`Creature`, including the boss) with `NetworkObject.ObjectId` as the
+  stable host entity id, position and HP.
+- Consumes Minecraft damage events and applies this adapter's configured multipliers
+  (`host.properties`) to the mapped host entity or the local player.
 
-## C# binding
-
-The reusable, game-independent part (mapping open, triple-buffer `acquire`, header/slot accessors)
-belongs in `bindings/csharp` and is shared by every future C# host. Only How to Fish-specific code
-lives here.
-
-## Verified facts from the prototype (carried over as reference only)
+## Verified facts from the prototype (carried over as reference)
 
 - `Player.LocalPlayer` is a static field (global namespace).
-- Player position: `player.Transform.position` (the component's own `transform` stays at origin).
-- View rotation: `player.CamObject.eulerAngles` (X=pitch, Y=yaw, Z=roll);
-  `player.Transform.eulerAngles` is always 0.
-- Prototype axis mapping: `(x, y, z) -> (-x, y, z)`, scale 1:1 (pending the Phase 2 ownership
-  decision — do not hard-code it).
+- Player position: `player.Transform.position`; view: `player.CamObject.eulerAngles`
+  (X=pitch, Y=yaw, Z=roll); `player.Transform.eulerAngles` is always 0.
+- Coordinate mapping is configurable (`transform.origin*`, `transform.scale`, `transform.flipX`).
 
-## Phase 1 compositing candidates (to verify)
+## Configuration (`host.properties`, this folder)
 
-How to Fish is **URP**. In order of preference:
-1. `RenderPipelineManager.endCameraRendering` + `CommandBuffer` quad;
-2. a dedicated overlay `Camera` / `RenderTexture` blit;
-3. a UGUI raw-image layer.
+Lives with the adapter, **not** in the protocol. Damage multipliers and the world→MC transform:
 
-The frame arrives **BGRA8** and **bottom-up** (`OVERLAY_BOTTOM_UP`), so the texture upload must flip
-rows (or the shader/UVs must account for it).
+```properties
+transform.scale=1.0
+transform.flipX=true
+damage.default=1.0
+damage.explosion=0.5
+damage.projectile=0.8
+damage.fall=0.2
+```
+
+Lookup order: `%LOCALAPPDATA%/CrossMC/howtofish.properties` → this folder's `host.properties` →
+built-in defaults. Copied next to `CrossMC.HowToFish.dll` at install time (see build script).
 
 ## Threading (hard rule)
 
-Game APIs (Unity `Camera`/`Texture2D`, `Player.LocalPlayer`, ...) may only be called on the Unity
-main thread. Shared-memory reads may happen anywhere; the texture upload and draw must be on the
-main thread.
+All game access (`Player`, `Creature`, `Physics`, `Texture2D`, drawing) runs on the Unity main
+thread. Only the shared-memory reads/writes are thread-agnostic.
 
-## Not here
+## Build
 
-The UDP prototype, the position/view follow logic, and the old HUD stay in the prototype repos
-(`HowToFishMC`, `HowToFishMC-Fabric`) and are not migrated here.
+```powershell
+dotnet build -c Release
+# -> bin/Release/CrossMC.HowToFish.dll  (copy to How to Fish/BepInEx/plugins/)
+```
+
+The game folder is set by the `GameDir` MSBuild property (default points at the local Steam
+install).
+
+## Not yet verified / known limits
+
+- The **creature damage entry point** (`Creature.LocalHit`) has a long gameplay-specific signature
+  that has not been verified against the current build; it is invoked best-effort via reflection and
+  failures are logged. Player damage uses the typed `PlayerVitals.TakeDamage(...)`.
+- Collider export currently uses `Physics.OverlapSphereNonAlloc` bounds (AABBs); it does not yet
+  distinguish Box/Sphere/Capsule precisely, nor preserve rotation.
+- The frame overlay is IMGUI (`OnGUI`); the URP `CommandBuffer` path is a later refinement.
+- The old UDP prototype, position/view follow and HUD stay in the prototype repos and are not
+  migrated here.

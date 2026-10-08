@@ -13,7 +13,7 @@ Thin Java runtime over the CrossMC shared memory, used by the Minecraft Fabric m
   (`mapping.path`), with `-Dcrossmc.config` / `CROSSMC_CONFIG` overrides and a built-in default
   (see the main README "Configuration").
 - `dev.crossmc.bridge.BridgeMemory` — opens the file-backed mapping (default
-  `%LOCALAPPDATA%\CrossMC\bridge_v2.bin`, from config), reads/writes the header and heartbeats,
+  `%LOCALAPPDATA%\CrossMC\bridge_v3.bin`, from config), reads/writes the header and heartbeats,
   implements the lock-free **triple buffer** and the **HostState/McState seqlocks**:
   - frame writer: `publishFrame(byte[] | ByteBuffer, w, h, flags)` (the `ByteBuffer` overload is
     the single-copy path for `glReadPixels` output);

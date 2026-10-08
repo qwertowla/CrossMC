@@ -35,17 +35,21 @@ Success: a live rectangle in How to Fish showing Minecraft's rendered frame.
 Validates: protocol, shared memory, triple buffer, frame transport, host composition.
 **Not** in this phase: player sync, input, depth, terrain, entities, combat, full camera sync.
 
-Progress:
-- Protocol v2 (`protocol/bridge_protocol.h`) — C-compatible, with Header size/sequence/timestamp,
-  HostState/McState (incl. roll/eye/timestamp), OverlayControl + OverlayFrameSlot, and reserved
-  InputRing/InputEvent + DepthFrame layouts.
-- Java binding (`bindings/java`) — done, `ShmSelfTest` PASS: file-backed mapping, triple buffer,
-  and HostState/McState **seqlocks**. Standalone Gradle build (`gradlew -p bindings/java selftest`).
-- Minecraft frame producer (`minecraft/FrameExporter`) — done: `WorldRenderEvents.END` →
-  `glReadPixels` (BGRA8, bottom-up) → `BridgeMemory.publishFrame`, plus config-driven mapping path
-  bundled into the jar. Needs real-client verification (image content/orientation, readback cost).
-- McState publishing / HostState consumption on the Minecraft side — not wired yet (Phase 2).
-- Host consumer (`bindings/csharp` + the `hosts/HowToFish` BepInEx plugin) — not started.
+Progress (protocol v3):
+- **Protocol** (`protocol/bridge_protocol.h`) — C-compatible (gcc/g++ verified): Header size/seq/ts,
+  HostState/McState seqlocks, overlay triple buffer, `ColliderTable`, `EntityTable`, `DamageRing`,
+  reserved `InputRing`/`DepthFrame`/`BlockEditRing`.
+- **Java binding** (`bindings/java`) — `ShmSelfTest` PASS: mapping, triple buffer, HostState/McState
+  seqlocks, collider/entity tables, damage ring. Standalone Gradle build.
+- **C# binding** (`bindings/csharp`) — mirrors the Java binding; builds with `dotnet build`.
+- **Minecraft** (`minecraft/`) — builds: frame producer (BGRA8 bottom-up, throttled, config-driven
+  path bundled in the jar), `McState` publisher, host-collision proxies via
+  `World#getBlockState` mixin, hidden armor-stand entity proxies on the integrated server, and
+  native damage capture (`ServerLivingEntityEvents.AFTER_DAMAGE`).
+- **Host adapter** (`hosts/HowToFish`) — builds: frame overlay, HostState/collider/entity export,
+  damage consumption with `host.properties` multipliers.
+- **Not verified in-game yet**: frame content/orientation, collision proxy movement, proxy
+  entity binding, damage application (especially `Creature.LocalHit`). See the adapter README.
 
 ## Phase 2 — Player / camera sync
 Decide player/camera ownership for this host, wire transform/camera exchange.

@@ -52,7 +52,7 @@ public final class FrameExporter {
 			try {
 				capture();
 			} catch (Throwable t) {
-				CrossMcMinecraftClient.LOGGER.error("CrossMC frame export failed", t);
+				CrossMcMinecraft.LOGGER.error("CrossMC frame export failed", t);
 			}
 		});
 	}

@@ -388,6 +388,240 @@ public final class BridgeMemory implements Closeable {
 		throw new IllegalStateException("McState seqlock read failed after " + SEQ_RETRIES + " retries");
 	}
 
+	// ------------------------------------------------------------------ cross-space tables
+
+	/** Zeroes the table/ring headers. Call once by the creator, next to {@link #initTripleBuffer()}. */
+	public void initTables() {
+		map.putInt((int) Protocol.OFF_COLLIDERS + 8, Protocol.COLLIDER_CAPACITY);
+		map.putInt((int) Protocol.OFF_ENTITIES + 8, Protocol.ENTITY_CAPACITY);
+		map.putInt((int) Protocol.OFF_DAMAGE + 8, Protocol.DAMAGE_CAPACITY);
+		map.putInt((int) Protocol.OFF_BLOCK_EDITS + 8, Protocol.BLOCK_EDIT_CAPACITY);
+
+		map.putInt((int) Protocol.OFF_COLLIDERS, 0);
+		map.putInt((int) Protocol.OFF_COLLIDERS + 4, 0);
+		map.putInt((int) Protocol.OFF_ENTITIES, 0);
+		map.putInt((int) Protocol.OFF_ENTITIES + 4, 0);
+		map.putInt((int) Protocol.OFF_DAMAGE, 0);
+		map.putInt((int) Protocol.OFF_DAMAGE + 4, 0);
+		map.putInt((int) Protocol.OFF_BLOCK_EDITS, 0);
+		map.putInt((int) Protocol.OFF_BLOCK_EDITS + 4, 0);
+	}
+
+	/** Host -> Minecraft. Rewrites the whole collider table under a seqlock. */
+	public void writeColliderTable(Collider[] items) {
+		long b = Protocol.OFF_COLLIDERS;
+		int seq = readSeq(b);
+		writeSeq(b, seq + 1);
+		VarHandle.fullFence();
+
+		int n = Math.min(items.length, Protocol.COLLIDER_CAPACITY);
+		map.putInt((int) b + 4, n);
+		map.putInt((int) b + 8, Protocol.COLLIDER_CAPACITY);
+		map.putLong((int) b + 16, map.getLong((int) b + 16) + 1L);
+		map.putLong((int) b + 24, System.currentTimeMillis());
+
+		for (int i = 0; i < n; i++) {
+			Collider c = items[i];
+			long e = Protocol.OFF_COLLIDER_ENTRIES + (long) i * Protocol.COLLIDER_SIZE;
+			map.putInt((int) e + 0, c.id);
+			map.putInt((int) e + 4, c.type);
+			map.putInt((int) e + 8, c.flags);
+			map.putFloat((int) e + 16, c.centerX);
+			map.putFloat((int) e + 20, c.centerY);
+			map.putFloat((int) e + 24, c.centerZ);
+			map.putFloat((int) e + 28, c.halfX);
+			map.putFloat((int) e + 32, c.halfY);
+			map.putFloat((int) e + 36, c.halfZ);
+			map.putFloat((int) e + 40, c.rotYaw);
+			map.putLong((int) e + 48, c.updatedMs == 0 ? System.currentTimeMillis() : c.updatedMs);
+		}
+
+		VarHandle.fullFence();
+		writeSeq(b, seq + 2);
+	}
+
+	/** Reads a consistent collider table snapshot. */
+	public Collider[] readColliderTable() {
+		long b = Protocol.OFF_COLLIDERS;
+
+		for (int attempt = 0; attempt < SEQ_RETRIES; attempt++) {
+			int s1 = readSeq(b);
+
+			if ((s1 & 1) != 0) {
+				continue;
+			}
+
+			VarHandle.acquireFence();
+			int n = map.getInt((int) b + 4);
+
+			if (n < 0 || n > Protocol.COLLIDER_CAPACITY) {
+				n = Math.max(0, Math.min(n, Protocol.COLLIDER_CAPACITY));
+			}
+
+			Collider[] out = new Collider[n];
+
+			for (int i = 0; i < n; i++) {
+				long e = Protocol.OFF_COLLIDER_ENTRIES + (long) i * Protocol.COLLIDER_SIZE;
+				Collider c = new Collider();
+				c.id = map.getInt((int) e + 0);
+				c.type = map.getInt((int) e + 4);
+				c.flags = map.getInt((int) e + 8);
+				c.centerX = map.getFloat((int) e + 16);
+				c.centerY = map.getFloat((int) e + 20);
+				c.centerZ = map.getFloat((int) e + 24);
+				c.halfX = map.getFloat((int) e + 28);
+				c.halfY = map.getFloat((int) e + 32);
+				c.halfZ = map.getFloat((int) e + 36);
+				c.rotYaw = map.getFloat((int) e + 40);
+				c.updatedMs = map.getLong((int) e + 48);
+				out[i] = c;
+			}
+
+			VarHandle.fullFence();
+
+			if (s1 == readSeq(b)) {
+				return out;
+			}
+		}
+
+		throw new IllegalStateException("ColliderTable seqlock read failed after " + SEQ_RETRIES + " retries");
+	}
+
+	/** Host -> Minecraft. Rewrites the whole entity table under a seqlock. */
+	public void writeEntityTable(EntityMap[] items) {
+		long b = Protocol.OFF_ENTITIES;
+		int seq = readSeq(b);
+		writeSeq(b, seq + 1);
+		VarHandle.fullFence();
+
+		int n = Math.min(items.length, Protocol.ENTITY_CAPACITY);
+		map.putInt((int) b + 4, n);
+		map.putInt((int) b + 8, Protocol.ENTITY_CAPACITY);
+		map.putLong((int) b + 16, map.getLong((int) b + 16) + 1L);
+		map.putLong((int) b + 24, System.currentTimeMillis());
+
+		for (int i = 0; i < n; i++) {
+			EntityMap m = items[i];
+			long e = Protocol.OFF_ENTITY_ENTRIES + (long) i * Protocol.ENTITY_SIZE;
+			map.putInt((int) e + 0, m.hostEntityId);
+			map.putInt((int) e + 4, m.mcEntityId);
+			map.putInt((int) e + 8, m.kind);
+			map.putInt((int) e + 12, m.flags);
+			map.putFloat((int) e + 16, m.x);
+			map.putFloat((int) e + 20, m.y);
+			map.putFloat((int) e + 24, m.z);
+			map.putFloat((int) e + 28, m.yaw);
+			map.putFloat((int) e + 32, m.pitch);
+			map.putFloat((int) e + 36, m.health);
+			map.putFloat((int) e + 40, m.maxHealth);
+			map.putLong((int) e + 48, m.updatedMs == 0 ? System.currentTimeMillis() : m.updatedMs);
+		}
+
+		VarHandle.fullFence();
+		writeSeq(b, seq + 2);
+	}
+
+	/** Reads a consistent entity table snapshot. */
+	public EntityMap[] readEntityTable() {
+		long b = Protocol.OFF_ENTITIES;
+
+		for (int attempt = 0; attempt < SEQ_RETRIES; attempt++) {
+			int s1 = readSeq(b);
+
+			if ((s1 & 1) != 0) {
+				continue;
+			}
+
+			VarHandle.acquireFence();
+			int n = map.getInt((int) b + 4);
+
+			if (n < 0 || n > Protocol.ENTITY_CAPACITY) {
+				n = Math.max(0, Math.min(n, Protocol.ENTITY_CAPACITY));
+			}
+
+			EntityMap[] out = new EntityMap[n];
+
+			for (int i = 0; i < n; i++) {
+				long e = Protocol.OFF_ENTITY_ENTRIES + (long) i * Protocol.ENTITY_SIZE;
+				EntityMap m = new EntityMap();
+				m.hostEntityId = map.getInt((int) e + 0);
+				m.mcEntityId = map.getInt((int) e + 4);
+				m.kind = map.getInt((int) e + 8);
+				m.flags = map.getInt((int) e + 12);
+				m.x = map.getFloat((int) e + 16);
+				m.y = map.getFloat((int) e + 20);
+				m.z = map.getFloat((int) e + 24);
+				m.yaw = map.getFloat((int) e + 28);
+				m.pitch = map.getFloat((int) e + 32);
+				m.health = map.getFloat((int) e + 36);
+				m.maxHealth = map.getFloat((int) e + 40);
+				m.updatedMs = map.getLong((int) e + 48);
+				out[i] = m;
+			}
+
+			VarHandle.fullFence();
+
+			if (s1 == readSeq(b)) {
+				return out;
+			}
+		}
+
+		throw new IllegalStateException("EntityTable seqlock read failed after " + SEQ_RETRIES + " retries");
+	}
+
+	/** Minecraft -> host. Pushes one damage event (single producer). */
+	public void pushDamage(DamageEvent d) {
+		long b = Protocol.OFF_DAMAGE;
+		int head = map.getInt((int) b + 0);
+		int idx = Math.floorMod(head, Protocol.DAMAGE_CAPACITY);
+		long e = Protocol.OFF_DAMAGE_ENTRIES + (long) idx * Protocol.DAMAGE_EVENT_SIZE;
+		map.putInt((int) e + 0, d.hostEntityId);
+		map.putInt((int) e + 4, d.mcEntityId);
+		map.putInt((int) e + 8, d.sourceType);
+		map.putInt((int) e + 12, d.flags);
+		map.putFloat((int) e + 16, d.amount);
+		map.putInt((int) e + 20, d.attackerHostId);
+		map.putFloat((int) e + 24, d.x);
+		map.putFloat((int) e + 28, d.y);
+		map.putFloat((int) e + 32, d.z);
+		map.putFloat((int) e + 36, d.knockbackX);
+		map.putFloat((int) e + 40, d.knockbackZ);
+		map.putLong((int) e + 48, d.sequence == 0 ? head + 1L : d.sequence);
+		map.putLong((int) e + 56, d.timestampMs == 0 ? System.currentTimeMillis() : d.timestampMs);
+		VarHandle.fullFence();
+		map.putInt((int) b + 0, head + 1);
+	}
+
+	/** Host side: returns the next damage event, or {@code null} if none is pending. */
+	public DamageEvent pollDamage() {
+		long b = Protocol.OFF_DAMAGE;
+		int head = map.getInt((int) b + 0);
+		int tail = map.getInt((int) b + 4);
+
+		if (tail >= head) {
+			return null;
+		}
+
+		int idx = Math.floorMod(tail, Protocol.DAMAGE_CAPACITY);
+		long e = Protocol.OFF_DAMAGE_ENTRIES + (long) idx * Protocol.DAMAGE_EVENT_SIZE;
+		DamageEvent d = new DamageEvent();
+		d.hostEntityId = map.getInt((int) e + 0);
+		d.mcEntityId = map.getInt((int) e + 4);
+		d.sourceType = map.getInt((int) e + 8);
+		d.flags = map.getInt((int) e + 12);
+		d.amount = map.getFloat((int) e + 16);
+		d.attackerHostId = map.getInt((int) e + 20);
+		d.x = map.getFloat((int) e + 24);
+		d.y = map.getFloat((int) e + 28);
+		d.z = map.getFloat((int) e + 32);
+		d.knockbackX = map.getFloat((int) e + 36);
+		d.knockbackZ = map.getFloat((int) e + 40);
+		d.sequence = map.getLong((int) e + 48);
+		d.timestampMs = map.getLong((int) e + 56);
+		map.putInt((int) b + 4, tail + 1);
+		return d;
+	}
+
 	// ------------------------------------------------------------------ slot accessors
 
 	public int slotWidth(int slot) {

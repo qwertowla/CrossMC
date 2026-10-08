@@ -45,6 +45,31 @@ Design choices:
   frame). `glReadPixels` stalls the pipeline, so this keeps the game playable during validation.
 - Readback is full-resolution and CPU-side. GPU interop is out of scope for Phase 1.
 
+### `HostCollisionManager` + `WorldBlockStateMixin`
+
+Reads the host collider table, voxelises each collider into occupied block cells, and makes
+`ClientWorld.getBlockState(cell)` return a solid, invisible `barrier` state for those cells
+(`WorldBlockStateMixin`, client only). Because native collision (`CollisionView.getBlockCollisions`),
+raycast (`BlockView.raycast`) and block placement all read `getBlockState`, host space participates
+in Minecraft's **own** rules with no re-implementation. Existing real blocks are never hidden.
+Rotation is ignored (conservative AABB) and colliders are quantised to blocks.
+
+### `CrossMcMinecraft` + `HostEntityManager` + `DamageBridge`
+
+On the logical (integrated) server, host creatures/bosses are represented by hidden, gravity-less
+armor-stand proxies carrying `crossmc_proxy` + `crossmc_id_<hostEntityId>` tags, so Minecraft's
+native damage/explosion logic acts on them. `DamageBridge` observes
+`ServerLivingEntityEvents.AFTER_DAMAGE` and forwards every native damage event (melee, projectile,
+explosion/TNT, fall, fire, modded) to the host through the damage ring — no bespoke TNT system.
+
+### `McStatePublisher`
+
+Publishes `McState` (position, rotation, eye height, camera mode, flags) on the client tick via the
+seqlock.
+
+> Server-side proxies/damage require an **integrated server** (singleplayer/LAN). On a remote
+> dedicated server the client cannot create server entities — a documented phase limitation.
+
 ## Build
 
 Loom 1.18.2 requires the Gradle JVM to be **JDK ≥ 25**; the mod targets **Java 21**:

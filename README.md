@@ -69,7 +69,7 @@ as separate repositories.
 
 `config/crossmc.properties` controls where the shared memory lives (`mapping.path`). Both processes
 must resolve the same absolute file. The value supports `%VAR%` placeholders and a leading `~`, e.g.
-`%LOCALAPPDATA%/CrossMC/bridge_v2.bin`.
+`%LOCALAPPDATA%/CrossMC/bridge_v3.bin`.
 
 The config file is found in this order (first match wins):
 
@@ -113,6 +113,26 @@ Fixed for Phase 0/1: **Windows only**, **Minecraft 1.21.1 + Fabric**, **file-bac
 
 Progress: the Java binding and the Minecraft frame producer (`minecraft/FrameExporter`) are
 implemented and build; the C# host consumer is not started. See `minecraft/README.md` and
+`docs/ROADMAP.md`.
+
+---
+
+## Collision, entities and damage (protocol v3)
+
+Beyond the frame path, CrossMC maps the two worlds onto each other while keeping Minecraft as the
+logical/rules side:
+
+- **Host colliders → Minecraft collision proxies.** The host publishes collider AABBs; Minecraft
+  voxelises them and serves them as invisible solid cells through `World#getBlockState`, so
+  Minecraft's **native** collision, raycast and block placement see host space (no rules
+  re-implemented, real blocks never hidden).
+- **Entities.** Host creatures map to hidden Minecraft proxy entities via a stable host entity id
+  (`NetworkObject.ObjectId`).
+- **Damage.** Minecraft's native damage events on those proxies (melee, projectile, explosion/TNT,
+  fall, fire, modded) are forwarded to the host, which applies its own rules/multipliers. Damage
+  multipliers live in `hosts/HowToFish`, never in `protocol/`.
+
+Status: all modules build; in-game behaviour is not yet verified. See `docs/ARCHITECTURE.md` §12 and
 `docs/ROADMAP.md`.
 
 ---

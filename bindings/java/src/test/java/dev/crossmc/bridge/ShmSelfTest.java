@@ -120,6 +120,42 @@ public final class ShmSelfTest {
 				check(mcRead.yaw == mc.yaw && mcRead.pitch == mc.pitch, "McState rotation");
 				check(mcRead.frameCounter == mc.frameCounter, "McState frame counter");
 				check(mcRead.timestampMs == mc.timestampMs, "McState timestamp");
+
+				// ---- collider table (host -> MC) ----
+				writer.writeColliderTable(new Collider[] {
+						new Collider(7, Protocol.COLLIDER_BOX, 1f, 2f, 3f, 0.5f, 1f, 0.5f)
+				});
+				Collider[] colliders = reader.readColliderTable();
+				check(colliders.length == 1 && colliders[0].id == 7
+						&& colliders[0].halfX == 0.5f && colliders[0].halfY == 1f, "collider table round-trip");
+
+				// ---- entity table (host -> MC) ----
+				EntityMap entity = new EntityMap();
+				entity.hostEntityId = 42;
+				entity.kind = Protocol.ENTITY_CREATURE;
+				entity.x = 1f;
+				entity.y = 2f;
+				entity.z = 3f;
+				entity.health = 10f;
+				entity.maxHealth = 20f;
+				writer.writeEntityTable(new EntityMap[] {entity});
+				EntityMap[] entities = reader.readEntityTable();
+				check(entities.length == 1 && entities[0].hostEntityId == 42
+						&& entities[0].kind == Protocol.ENTITY_CREATURE
+						&& entities[0].health == 10f, "entity table round-trip");
+
+				// ---- damage ring (MC -> host) ----
+				DamageEvent damage = new DamageEvent();
+				damage.hostEntityId = 42;
+				damage.mcEntityId = 1234;
+				damage.sourceType = Protocol.DMG_EXPLOSION;
+				damage.amount = 20f;
+				writer.pushDamage(damage);
+				DamageEvent damageRead = reader.pollDamage();
+				check(damageRead != null && damageRead.hostEntityId == 42
+						&& damageRead.sourceType == Protocol.DMG_EXPLOSION
+						&& damageRead.amount == 20f, "damage ring round-trip");
+				check(reader.pollDamage() == null, "damage ring empty after consuming");
 			}
 		}
 

@@ -11,7 +11,7 @@
  * ------------
  * * SHARED MEMORY IS FILE-BACKED. The Java (Minecraft) side cannot open Win32 named
  *   sections (Local\...); it can only map a file. So both processes map the same file
- *   (default %LOCALAPPDATA%\CrossMC\bridge_v2.bin, configurable through
+ *   (default %LOCALAPPDATA%\CrossMC\bridge_v3.bin, configurable through
  *   config/crossmc.properties -> mapping.path). This is real cross-process shared memory
  *   (the OS page cache backs both mappings); it is just addressed by path.
  * * All multi-byte values are little-endian. Fixed-size POD structs only; no
@@ -46,10 +46,10 @@ CROSSMC_EXTERN_C_BEGIN
 /* ---- identity ---------------------------------------------------------------------- */
 /* "CMCB" (CrossMC Bridge), little-endian bytes 'C','M','C','B'. */
 #define CROSSMC_MAGIC   0x42434D43u
-#define CROSSMC_VERSION 2u
+#define CROSSMC_VERSION 3u
 /* Default file-backed mapping (relative to %LOCALAPPDATA%). Overridden by
  * config/crossmc.properties -> mapping.path; both processes must resolve the same file. */
-#define CROSSMC_MAPPING_SUBPATH L"CrossMC\\bridge_v2.bin"
+#define CROSSMC_MAPPING_SUBPATH L"CrossMC\\bridge_v3.bin"
 
 /* ---- frame geometry (v1 hard cap; pages are committed lazily by the OS) ------------- */
 #define CROSSMC_MAX_FRAME_W     3840u
@@ -67,6 +67,14 @@ CROSSMC_EXTERN_C_BEGIN
 #define CROSSMC_OFF_DEPTH_FRAME   0x0400   /* DepthFrame (reserved, Phase 4) */
 #define CROSSMC_OFF_INPUT_RING    0x1000   /* InputRing (reserved, Phase 3)  */
 #define CROSSMC_OFF_INPUT_EVENTS  0x1040   /* InputEvent[]                   */
+#define CROSSMC_OFF_COLLIDERS     0x20000  /* ColliderTable + Collider[]     */
+#define CROSSMC_OFF_ENTITIES      0x40000  /* EntityTable + EntityMap[]      */
+#define CROSSMC_OFF_DAMAGE        0x60000  /* DamageRing + DamageEvent[]     */
+#define CROSSMC_OFF_BLOCK_EDITS   0x80000  /* reverse block sync (reserved)  */
+#define CROSSMC_OFF_COLLIDER_ENTRIES (CROSSMC_OFF_COLLIDERS + 0x20)
+#define CROSSMC_OFF_ENTITY_ENTRIES   (CROSSMC_OFF_ENTITIES + 0x20)
+#define CROSSMC_OFF_DAMAGE_ENTRIES   (CROSSMC_OFF_DAMAGE + 0x10)
+#define CROSSMC_OFF_BLOCK_EDIT_ENTRIES (CROSSMC_OFF_BLOCK_EDITS + 0x10)
 #define CROSSMC_OFF_FRAMES        0x100000 /* 1 MiB align; 3 pixel slabs     */
 #define CROSSMC_MAPPING_BYTES \
 	(CROSSMC_OFF_FRAMES + CROSSMC_FRAME_SLOT_BYTES * 3)
@@ -267,6 +275,173 @@ typedef struct crossmc_depth_frame
 	uint64_t timestampMs;
 } DepthFrame;
 CROSSMC_STATIC_ASSERT(sizeof(DepthFrame) == 0x30, "DepthFrame size");
+
+/* ====================================================================================
+ * ColliderTable @0x20000 — host colliders -> Minecraft collision proxies.
+ *
+ * The host publishes its world colliders (in MINECRAFT space; the host adapter converts
+ * from its own space). Minecraft voxelises them into client-side collision proxies so its
+ * native collision / raycast / placement logic can see host space. The table is a
+ * whole-table seqlock: the writer rewrites count + entries under an odd `seq`, the reader
+ * retries until it gets a matching even `seq`.
+ *
+ * `id` is stable for the lifetime of the host collider so proxies can be updated/removed.
+ * ==================================================================================== */
+#define CROSSMC_COLLIDER_BOX     1u
+#define CROSSMC_COLLIDER_SPHERE  2u
+#define CROSSMC_COLLIDER_CAPSULE 3u
+
+#define CROSSMC_COLLIDER_ENABLED (1u << 0)
+#define CROSSMC_COLLIDER_DYNAMIC (1u << 1)
+
+#define CROSSMC_COLLIDER_CAPACITY 512u
+
+typedef struct crossmc_collider
+{
+	uint32_t id;                 /* stable host collider id */
+	uint32_t type;               /* CROSSMC_COLLIDER_* */
+	uint32_t flags;              /* CROSSMC_COLLIDER_* */
+	uint32_t reserved0;
+	float    centerX, centerY, centerZ; /* MC space */
+	float    halfX, halfY, halfZ;       /* box half extents; sphere r=halfX; capsule r=halfX, halfH=halfY */
+	float    rotYaw;             /* rotation about +Y, degrees (box/capsule) */
+	uint32_t reserved1;
+	uint64_t updatedMs;          /* epoch ms */
+} Collider;
+CROSSMC_STATIC_ASSERT(sizeof(Collider) == 0x38, "Collider size");
+
+typedef struct crossmc_collider_table
+{
+	uint32_t seq;                /* seqlock counter */
+	uint32_t count;
+	uint32_t capacity;           /* CROSSMC_COLLIDER_CAPACITY */
+	uint32_t flags;              /* reserved */
+	uint64_t revision;           /* bumps on every rewrite */
+	uint64_t timestampMs;
+} ColliderTable;
+CROSSMC_STATIC_ASSERT(sizeof(ColliderTable) == 0x20, "ColliderTable size");
+
+/* ====================================================================================
+ * EntityTable @0x40000 — host entities <-> Minecraft proxy entities.
+ *
+ * The host publishes its creatures/items/bosses (MC-space position + health). Minecraft
+ * spawns one hidden proxy entity per row and binds it to `hostEntityId` (= FishNet
+ * NetworkObject.ObjectId). Damage done to the proxy is reported back through DamageRing.
+ * `hostEntityId` is the stable key; `mcEntityId` is filled in by Minecraft (0 = unbound).
+ * ==================================================================================== */
+#define CROSSMC_ENTITY_CREATURE 1u
+#define CROSSMC_ENTITY_PLAYER   2u
+#define CROSSMC_ENTITY_ITEM     3u
+#define CROSSMC_ENTITY_BOSS     4u
+
+#define CROSSMC_ENTITY_DEAD    (1u << 0)
+#define CROSSMC_ENTITY_BOSS_FLAG (1u << 1)
+#define CROSSMC_ENTITY_VISIBLE (1u << 2)
+
+#define CROSSMC_ENTITY_CAPACITY 512u
+
+typedef struct crossmc_entity_map
+{
+	uint32_t hostEntityId;       /* FishNet NetworkObject.ObjectId (stable) */
+	uint32_t mcEntityId;         /* bound Minecraft entity id, 0 = unbound */
+	uint32_t kind;               /* CROSSMC_ENTITY_* */
+	uint32_t flags;              /* CROSSMC_ENTITY_* */
+	float    x, y, z;            /* MC space feet position */
+	float    yaw, pitch;
+	float    health, maxHealth;
+	uint32_t reserved0;
+	uint64_t updatedMs;
+} EntityMap;
+CROSSMC_STATIC_ASSERT(sizeof(EntityMap) == 0x38, "EntityMap size");
+
+typedef struct crossmc_entity_table
+{
+	uint32_t seq;                /* seqlock counter */
+	uint32_t count;
+	uint32_t capacity;           /* CROSSMC_ENTITY_CAPACITY */
+	uint32_t flags;
+	uint64_t revision;
+	uint64_t timestampMs;
+} EntityTable;
+CROSSMC_STATIC_ASSERT(sizeof(EntityTable) == 0x20, "EntityTable size");
+
+/* ====================================================================================
+ * DamageRing @0x60000 — Minecraft damage events -> host.
+ *
+ * Minecraft writes one DamageEvent for every native damage applied to a proxy entity
+ * (melee, projectile, explosion/TNT, fall, fire, ...). The host reads them and applies its
+ * own damage rules/multipliers to the real host entity. Single producer (Minecraft) /
+ * single consumer (host); head/tail are monotonic counters, entry index = i % capacity.
+ * ==================================================================================== */
+#define CROSSMC_DMG_GENERIC    0u
+#define CROSSMC_DMG_PLAYER     1u
+#define CROSSMC_DMG_MOB        2u
+#define CROSSMC_DMG_PROJECTILE 3u
+#define CROSSMC_DMG_EXPLOSION  4u
+#define CROSSMC_DMG_FALL       5u
+#define CROSSMC_DMG_FIRE       6u
+#define CROSSMC_DMG_MAGIC      7u
+#define CROSSMC_DMG_OTHER      8u
+
+#define CROSSMC_DMG_CRITICAL (1u << 0)
+
+#define CROSSMC_DAMAGE_CAPACITY 1024u
+
+typedef struct crossmc_damage_event
+{
+	uint32_t hostEntityId;       /* victim host entity id */
+	uint32_t mcEntityId;         /* victim MC entity id */
+	uint32_t sourceType;         /* CROSSMC_DMG_* */
+	uint32_t flags;              /* CROSSMC_DMG_* */
+	float    amount;             /* raw damage as applied by Minecraft */
+	uint32_t attackerHostId;     /* 0 = none */
+	float    x, y, z;            /* victim position (MC space) */
+	float    knockbackX, knockbackZ;
+	uint32_t reserved0;
+	uint64_t sequence;
+	uint64_t timestampMs;
+} DamageEvent;
+CROSSMC_STATIC_ASSERT(sizeof(DamageEvent) == 0x40, "DamageEvent size");
+
+typedef struct crossmc_damage_ring
+{
+	uint32_t head;               /* producer (Minecraft) monotonic write counter */
+	uint32_t tail;               /* consumer (host) monotonic read counter */
+	uint32_t capacity;           /* CROSSMC_DAMAGE_CAPACITY */
+	uint32_t reserved0;
+} DamageRing;
+CROSSMC_STATIC_ASSERT(sizeof(DamageRing) == 0x10, "DamageRing size");
+
+/* ====================================================================================
+ * BlockEditRing @0x80000 — Minecraft blocks -> host (RESERVED, reverse direction).
+ *
+ * Placeholder so the reverse constraint path (MC block space constraining host entities)
+ * can be added without another layout change. Not written in v1.
+ * ==================================================================================== */
+#define CROSSMC_BLOCK_SET   1u
+#define CROSSMC_BLOCK_CLEAR 2u
+
+#define CROSSMC_BLOCK_EDIT_CAPACITY 1024u
+
+typedef struct crossmc_block_edit
+{
+	int32_t  x, y, z;            /* MC block position */
+	uint32_t action;             /* CROSSMC_BLOCK_* */
+	uint32_t blockId;            /* opaque MC block state id */
+	uint32_t reserved0;
+	uint64_t sequence;
+	uint64_t timestampMs;
+} BlockEdit;
+CROSSMC_STATIC_ASSERT(sizeof(BlockEdit) == 0x28, "BlockEdit size");
+
+typedef struct crossmc_block_edit_ring
+{
+	uint32_t head;
+	uint32_t tail;
+	uint32_t capacity;
+	uint32_t reserved0;
+} BlockEditRing;
+CROSSMC_STATIC_ASSERT(sizeof(BlockEditRing) == 0x10, "BlockEditRing size");
 
 CROSSMC_EXTERN_C_END
 
