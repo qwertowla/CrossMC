@@ -40,8 +40,14 @@ public class CrossMcMinecraftClient implements ClientModInitializer {
 
 			memory.writeMcHeartbeat(System.currentTimeMillis());
 			memory.writeMcCapabilities(Protocol.CAP_FRAME | Protocol.CAP_STATE | Protocol.CAP_ENTITY
-					| Protocol.CAP_COLLISION | Protocol.CAP_DAMAGE | Protocol.CAP_INPUT);
+					| Protocol.CAP_COLLISION | Protocol.CAP_DAMAGE | Protocol.CAP_INPUT
+					| Protocol.CAP_HOST_FRAME);
+			ClientRenderConfig.load();
 			FrameExporter.register();
+
+			// Host -> Minecraft video: consume the host frame (render thread) and draw it in-world.
+			HostFrameConsumer.register();
+			HostFrameRenderer.register();
 
 			ClientTickEvents.END_CLIENT_TICK.register(client -> {
 				// Run bootstrap first so McStatePublisher reports BOOTSTRAP_DONE after the align.

@@ -1,6 +1,6 @@
 # CrossMC 实机验证清单
 
-> 目的：按顺序验证协议 v4 的各条链路。**前一步没通过就不要进入下一步**，否则问题会叠加难以定位。
+> 目的：按顺序验证协议 v5 的各条链路。**前一步没通过就不要进入下一步**，否则问题会叠加难以定位。
 > 每一步都给出：操作 / 预期 / 怎么检查 / 失败排查。
 >
 > 前提：本轮实现只编译通过、**尚未实机验证**；本清单用于逐步确认。
@@ -43,7 +43,7 @@ dotnet build -c Release
 ### 重置（每次验证前建议）
 
 ```powershell
-Remove-Item "$env:LOCALAPPDATA\CrossMC\bridge_v4.bin" -ErrorAction SilentlyContinue
+Remove-Item "$env:LOCALAPPDATA\CrossMC\bridge_v5.bin" -ErrorAction SilentlyContinue
 ```
 
 - 修改 `CrossMC.HowToFish.dll` 后**必须重启 How to Fish**（BepInEx 启动时加载）。
@@ -54,7 +54,7 @@ Remove-Item "$env:LOCALAPPDATA\CrossMC\bridge_v4.bin" -ErrorAction SilentlyConti
 ```powershell
 cd CrossMC\tools\TestHost
 dotnet run -- --sim-mc
-# 期望：mapping=...bridge_v4.bin；周期性输出 hostAlive=True mcAlive=True，
+# 期望：mapping=...bridge_v5.bin；周期性输出 hostAlive=True mcAlive=True，
 #       并消费到 damage: cross=1001 ...。
 # Ctrl+C 退出。
 ```
@@ -74,13 +74,13 @@ CrossEntityId、以及心跳存活判断。**不依赖 Minecraft 或 Unity**，�
 **操作**：先启动 Minecraft 进入一个世界，再启动 How to Fish（顺序无所谓，两边都会创建/加入 header）。
 
 **预期**：
-- Minecraft 日志出现 `CrossMC bridge ready: ...\bridge_v4.bin`，以及 `created/joined shared memory header (mcPid=...)`。
+- Minecraft 日志出现 `CrossMC bridge ready: ...\bridge_v5.bin`，以及 `created/joined shared memory header (mcPid=...)`。
 - How to Fish 日志出现 `CrossMC host ready. config=...` 与 `created/joined shared memory header (hostPid=...)`。
-- `%LOCALAPPDATA%\CrossMC\bridge_v4.bin` 大小 = **100,581,376** 字节。
+- `%LOCALAPPDATA%\CrossMC\bridge_v5.bin` 大小 = **144,900,096** 字节。
 
 **检查**：
 ```powershell
-(Get-Item "$env:LOCALAPPDATA\CrossMC\bridge_v4.bin").Length   # 期望 100581376
+(Get-Item "$env:LOCALAPPDATA\CrossMC\bridge_v5.bin").Length   # 期望 144900096
 ```
 
 **失败排查**：
@@ -102,7 +102,7 @@ CrossEntityId、以及心跳存活判断。**不依赖 Minecraft 或 Unity**，�
 - 帧率：默认 `-Dcrossmc.exportFps=15`（启动器 JVM 参数）。观察游戏是否卡顿。
 
 **失败排查**：
-- 没有矩形 → 宿主没 `Acquire()` 到帧：确认 MC 侧 `FrameExporter` 有发布（日志无 `frame export failed`），且两边版本都是 v4。
+- 没有矩形 → 宿主没 `Acquire()` 到帧：确认 MC 侧 `FrameExporter` 有发布（日志无 `frame export failed`），且两边版本都是 v5。
 - 花屏/尺寸错 → 槽宽高与 stride 不一致；查宿主日志里的 overlay 尺寸。
 - 全黑 → `glReadPixels` 格式/读缓冲问题（`GL_BGRA`、只绑 `GL_READ_FRAMEBUFFER`）。
 

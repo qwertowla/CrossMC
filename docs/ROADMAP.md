@@ -35,7 +35,7 @@ Success: a live rectangle in How to Fish showing Minecraft's rendered frame.
 Validates: protocol, shared memory, triple buffer, frame transport, host composition.
 **Not** in this phase: player sync, input, depth, terrain, entities, combat, full camera sync.
 
-Progress (protocol v4):
+Progress (protocol v5):
 - **Protocol** (`protocol/bridge_protocol.h`) — C-compatible (gcc/g++ verified): Header with
   capability bitmasks, size/seq/ts; HostState/McState seqlocks; overlay triple buffer;
   `ColliderTable` (id + revision + lifecycle flags), `EntityTable` (stable `CrossEntityId`),

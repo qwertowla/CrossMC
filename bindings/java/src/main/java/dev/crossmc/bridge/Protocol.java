@@ -23,10 +23,10 @@ public final class Protocol {
 	}
 
 	public static final int MAGIC = 0x42434D43;   // 'C','M','C','B'
-	public static final int VERSION = 4;
+	public static final int VERSION = 5;
 
 	public static final String MAPPING_SUBDIR = "CrossMC";
-	public static final String MAPPING_FILE = "bridge_v4.bin";
+	public static final String MAPPING_FILE = "bridge_v5.bin";
 
 	// ---- capabilities (CROSSMC_CAP_*) ----
 	public static final int CAP_FRAME = 1 << 0;
@@ -37,8 +37,9 @@ public final class Protocol {
 	public static final int CAP_INPUT = 1 << 5;
 	public static final int CAP_DEPTH = 1 << 6;
 	public static final int CAP_BLOCK_EDIT = 1 << 7;
+	public static final int CAP_HOST_FRAME = 1 << 8;
 	public static final int CAP_ALL = CAP_FRAME | CAP_STATE | CAP_ENTITY | CAP_COLLISION
-			| CAP_DAMAGE | CAP_INPUT | CAP_DEPTH | CAP_BLOCK_EDIT;
+			| CAP_DAMAGE | CAP_INPUT | CAP_DEPTH | CAP_BLOCK_EDIT | CAP_HOST_FRAME;
 
 	public static final long HEARTBEAT_TIMEOUT_MS = 2000L;
 
@@ -52,8 +53,14 @@ public final class Protocol {
 
 	public static final int MAX_FRAME_W = 3840;
 	public static final int MAX_FRAME_H = 2160;
-	public static final int BYTES_PER_PIXEL = 4;  // BGRA8
+	public static final int BYTES_PER_PIXEL = 4;  // BGRA8 / RGBA8
 	public static final long FRAME_SLOT_BYTES = (long) MAX_FRAME_W * MAX_FRAME_H * BYTES_PER_PIXEL;
+
+	// host frame (host -> Minecraft), separate triple buffer, smaller hard cap
+	public static final int MAX_HOSTFRAME_W = 2560;
+	public static final int MAX_HOSTFRAME_H = 1440;
+	public static final long HOSTFRAME_SLOT_BYTES =
+			(long) MAX_HOSTFRAME_W * MAX_HOSTFRAME_H * BYTES_PER_PIXEL;
 
 	// region offsets (bytes)
 	public static final long OFF_HEADER = 0x0000L;
@@ -62,6 +69,8 @@ public final class Protocol {
 	public static final long OFF_OVERLAY_CTL = 0x0300L;
 	public static final long OFF_OVERLAY_SLOTS = 0x0340L;
 	public static final long OFF_DEPTH_FRAME = 0x0400L;
+	public static final long OFF_HOSTFRAME_CTL = 0x0500L;
+	public static final long OFF_HOSTFRAME_SLOTS = 0x0540L;
 	public static final long OFF_INPUT_RING = 0x1000L;
 	public static final long OFF_INPUT_EVENTS = 0x1040L;
 	public static final long OFF_COLLIDERS = 0x20000L;
@@ -73,7 +82,9 @@ public final class Protocol {
 	public static final long OFF_BLOCK_EDITS = 0x80000L;
 	public static final long OFF_BLOCK_EDIT_ENTRIES = OFF_BLOCK_EDITS + 0x10L;
 	public static final long OFF_FRAMES = 0x100000L;
-	public static final long MAPPING_BYTES = OFF_FRAMES + FRAME_SLOT_BYTES * 3L;
+	public static final long OFF_HOSTFRAME_FRAMES =
+			(OFF_FRAMES + FRAME_SLOT_BYTES * 3L + 0xFFFFFL) & ~0xFFFFFL;
+	public static final long MAPPING_BYTES = OFF_HOSTFRAME_FRAMES + HOSTFRAME_SLOT_BYTES * 3L;
 
 	// struct sizes (must equal the C static_asserts)
 	public static final int HEADER_SIZE = 0x50;
@@ -191,7 +202,14 @@ public final class Protocol {
 	public static final int OVERLAY_INDEX_MASK = 0x3;
 
 	public static final int FORMAT_BGRA8 = 1;
+	public static final int FORMAT_RGBA8 = 2;
 	public static final int OVERLAY_BOTTOM_UP = 1 << 0;
+
+	// HostFrameControl (host -> MC), same encoding as OverlayControl
+	public static final long HOSTFRAME_CTL_STATE = OFF_HOSTFRAME_CTL + 0L;
+	public static final long HOSTFRAME_CTL_FRAMES_PUBLISHED = OFF_HOSTFRAME_CTL + 8L;
+	public static final long HOSTFRAME_CTL_SEQUENCE = OFF_HOSTFRAME_CTL + 16L;
+	public static final long HOSTFRAME_CTL_TIMESTAMP = OFF_HOSTFRAME_CTL + 24L;
 
 	// HostState field offsets (relative to OFF_HOST_STATE)
 	public static final int HOST_SEQ = 0;
@@ -245,6 +263,16 @@ public final class Protocol {
 	/** Byte offset of slot {@code i}'s pixel slab. */
 	public static long slotPixels(int i) {
 		return OFF_FRAMES + (long) i * FRAME_SLOT_BYTES;
+	}
+
+	/** Byte offset of host-frame slot {@code i}'s 0x40-byte header. */
+	public static long hostFrameSlotHdr(int i) {
+		return OFF_HOSTFRAME_SLOTS + (long) i * OVERLAY_SLOT_SIZE;
+	}
+
+	/** Byte offset of host-frame slot {@code i}'s pixel slab. */
+	public static long hostFrameSlotPixels(int i) {
+		return OFF_HOSTFRAME_FRAMES + (long) i * HOSTFRAME_SLOT_BYTES;
 	}
 
 	/**
@@ -316,7 +344,7 @@ public final class Protocol {
 		return "built-in default";
 	}
 
-	private static String configValue(String key) {
+	public static String configValue(String key) {
 		Properties props = loadConfig();
 		return props == null ? null : props.getProperty(key);
 	}

@@ -1,4 +1,4 @@
-# PROTOCOL — CrossMC v4
+# PROTOCOL — CrossMC v5
 
 > The byte layout is defined by `protocol/bridge_protocol.h` (single source of truth) and mirrored
 > by `bindings/java` and `bindings/csharp`. This document describes the *semantics*: coordinate
@@ -102,8 +102,8 @@ Idle colliders need not be resent every frame.
 ## 6. Capabilities
 
 `Header.hostCapabilities` / `Header.mcCapabilities` are feature bitmasks (`CROSSMC_CAP_*`):
-`FRAME, STATE, ENTITY, COLLISION, DAMAGE, INPUT, DEPTH, BLOCK_EDIT`. A feature is active only when
-**both** peers advertise it. There is no negotiation handshake beyond the header.
+`FRAME, STATE, ENTITY, COLLISION, DAMAGE, INPUT, DEPTH, BLOCK_EDIT, HOST_FRAME`. A feature is active
+only when **both** peers advertise it. There is no negotiation handshake beyond the header.
 
 ---
 
@@ -131,3 +131,25 @@ play. It is reserved for host-specific / non-player interaction and future use.
   custom movement — and releases everything on `INPUT_RELEASE_ALL`, heartbeat timeout or an open GUI.
 - `HostInputConsumer` / `MouseMixin` on the Minecraft side implement this, but they only act when a
   host actually sends events. **Host input capture is off by default** (`input.capture=false`).
+
+---
+
+## 9. Video channels
+
+There are **two independent** lock-free triple buffers with separate control words, slots and pixel
+slabs — no shared producer slot:
+
+| Channel | Direction | Writer | Reader | Capability | Slab cap |
+|---|---|---|---|---|---|
+| Overlay frame | Minecraft → host | Minecraft (`FrameExporter`) | host (`FrameOverlay`) | `FRAME` | 3840×2160 |
+| Host frame | host → Minecraft | host (`HostFrameExporter`) | Minecraft (`HostFrameConsumer`) | `HOST_FRAME` | 2560×1440 |
+
+Both use the same 0x40-byte slot header (`width, height, strideBytes, format, flags, bufferIndex,
+frameId, sequence, timestampMs`) and the same triple-buffer publish/acquire protocol
+(`exchange(state, slot | FRESH)`; the consumer never blocks the producer; latest frame wins; a missed
+frame is just skipped). `format` is `BGRA8` or `RGBA8`; `flags` bit 0 (`BOTTOM_UP`) says the rows are
+stored bottom-up, so the consumer can normalise orientation instead of guessing.
+
+The host frame is a plain video stream: the host adapter captures its camera (how it does so is
+game-specific) and Minecraft draws the newest frame on a world-space quad. The video channel never
+blocks `McState`/`EntityTable`/`ColliderTable`/`DamageRing` — a dropped frame is a dropped frame.

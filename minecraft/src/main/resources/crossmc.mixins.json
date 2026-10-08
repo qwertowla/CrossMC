@@ -6,7 +6,8 @@
 	"client": [
 		"WorldBlockStateMixin",
 		"MouseMixin",
-		"BlockPlacementPhantomMixin"
+		"BlockPlacementPhantomMixin",
+		"NativeImageAccessor"
 	],
 	"injectors": {
 		"defaultRequire": 1

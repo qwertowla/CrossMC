@@ -44,6 +44,7 @@ public final class BridgeMemory implements Closeable {
 	private int front;   // reader's private read slot
 	private long writeFrameId;
 	private long framesPublished;
+	private int hostFrameFront;  // host-frame reader's private front slot (host -> MC)
 
 	private BridgeMemory(RandomAccessFile raf, FileChannel channel, MappedByteBuffer map) {
 		this.raf = raf;
@@ -182,6 +183,74 @@ public final class BridgeMemory implements Closeable {
 		map.putLong((int) Protocol.CTL_FRAMES_PUBLISHED, 0L);
 		map.putLong((int) Protocol.CTL_SEQUENCE, 0L);
 		map.putLong((int) Protocol.CTL_TIMESTAMP, 0L);
+
+		// Host-frame (host -> MC) triple buffer: this side is the reader.
+		hostFrameFront = 0;
+		map.putInt((int) Protocol.HOSTFRAME_CTL_STATE, 1);
+		map.putLong((int) Protocol.HOSTFRAME_CTL_FRAMES_PUBLISHED, 0L);
+		map.putLong((int) Protocol.HOSTFRAME_CTL_SEQUENCE, 0L);
+		map.putLong((int) Protocol.HOSTFRAME_CTL_TIMESTAMP, 0L);
+	}
+
+	/**
+	 * Reader side (Minecraft) of the host-frame triple buffer: returns the newest ready slot, or
+	 * {@code -1} if no fresh host frame is available. Never blocks the host (writer).
+	 */
+	public int hostFrameAcquire() {
+		int state = (int) STATE.getVolatile(map, (int) Protocol.HOSTFRAME_CTL_STATE);
+
+		if ((state & Protocol.OVERLAY_FRESH) == 0) {
+			return -1;
+		}
+
+		int old = (int) STATE.getAndSet(map, (int) Protocol.HOSTFRAME_CTL_STATE, hostFrameFront);
+		hostFrameFront = old & Protocol.OVERLAY_INDEX_MASK;
+		return old & Protocol.OVERLAY_INDEX_MASK;
+	}
+
+	public int hostFrameFrontSlot() {
+		return hostFrameFront;
+	}
+
+	public int hostFrameSlotWidth(int slot) {
+		return map.getInt((int) Protocol.hostFrameSlotHdr(slot) + 0);
+	}
+
+	public int hostFrameSlotHeight(int slot) {
+		return map.getInt((int) Protocol.hostFrameSlotHdr(slot) + 4);
+	}
+
+	public int hostFrameSlotStride(int slot) {
+		return map.getInt((int) Protocol.hostFrameSlotHdr(slot) + 8);
+	}
+
+	public int hostFrameSlotFormat(int slot) {
+		return map.getInt((int) Protocol.hostFrameSlotHdr(slot) + 12);
+	}
+
+	public int hostFrameSlotFlags(int slot) {
+		return map.getInt((int) Protocol.hostFrameSlotHdr(slot) + 16);
+	}
+
+	public long hostFrameSlotSequence(int slot) {
+		return map.getLong((int) Protocol.hostFrameSlotHdr(slot) + 32);
+	}
+
+	public long hostFrameSlotTimestampMs(int slot) {
+		return map.getLong((int) Protocol.hostFrameSlotHdr(slot) + 40);
+	}
+
+	/** Copies a host-frame slot's pixels into {@code dst} ({@code stride * height} bytes). */
+	public void hostFrameReadPixels(int slot, byte[] dst) {
+		map.get((int) Protocol.hostFrameSlotPixels(slot), dst, 0, dst.length);
+	}
+
+	public long hostFrameSequence() {
+		return map.getLong((int) Protocol.HOSTFRAME_CTL_SEQUENCE);
+	}
+
+	public long hostFrameFramesPublished() {
+		return map.getLong((int) Protocol.HOSTFRAME_CTL_FRAMES_PUBLISHED);
 	}
 
 	/** Reader side: returns the slot to read now, or -1 if no fresh frame is available. */

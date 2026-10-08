@@ -7,7 +7,7 @@ repository).
 
 ## What is here
 
-- `Protocol.cs` — mirror of `protocol/bridge_protocol.h` (v4): magic, version, region offsets,
+- `Protocol.cs` — mirror of `protocol/bridge_protocol.h` (v5): magic, version, region offsets,
   field offsets, sizes, kinds/flags. Keep it identical to the C header and the Java binding.
 - `Config.cs` — resolves `mapping.path` the same way as Java (`CROSSMC_CONFIG` →
   `./config/crossmc.properties` → `%LOCALAPPDATA%/CrossMC/crossmc.properties` → default), with

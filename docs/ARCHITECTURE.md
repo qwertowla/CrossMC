@@ -150,7 +150,7 @@ camera sync, input, terrain, entities, combat, GPU sharing, frame lockstep.
 | Platform | Windows only (no macOS/Linux/CrossOver) |
 | Minecraft | 1.21.1 + Fabric (Loader 0.19.5, Fabric API 0.116.17+1.21.1) |
 | Host | How to Fish only (Unity 6 / Mono / BepInEx 5) |
-| Transport | File-backed shared memory, path from `config/crossmc.properties` `mapping.path` (default `%LOCALAPPDATA%\CrossMC\bridge_v4.bin`) |
+| Transport | File-backed shared memory, path from `config/crossmc.properties` `mapping.path` (default `%LOCALAPPDATA%\CrossMC\bridge_v5.bin`) |
 | Frame transfer | CPU readback (no GPU interop yet) |
 | Frame buffering | Triple buffer |
 | State sync | Seqlock latest-value slots |
@@ -222,7 +222,7 @@ Policy:
 
 ---
 
-## 12. Cross-space mapping (protocol v4)
+## 12. Cross-space mapping (protocol v5)
 
 Roles for this phase: **Minecraft is the logical/rules side; the host game is the world/presentation
 side.** Minecraft's player is the primary player; host entities map to Minecraft proxy entities;
@@ -270,6 +270,6 @@ DamageRing (SPSC)  →  host adapter  →  multiplier from the host repo config 
 
 ### 12.4 Status
 
-Implemented and building: protocol v4, Java + C# bindings (with tests for Java), the Minecraft
+Implemented and building: protocol v5, Java + C# bindings (with tests for Java), the Minecraft
 collision/entity/damage plumbing, and the How to Fish adapter. **Not yet verified in-game**; see
 `docs/ROADMAP.md`.

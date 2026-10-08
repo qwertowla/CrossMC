@@ -9,14 +9,14 @@ namespace CrossMC.Bridge
     public static class Protocol
     {
         public const uint Magic = 0x42434D43u; // 'C','M','C','B'
-        public const uint Version = 4;
+        public const uint Version = 5;
 
         public const string MappingSubdir = "CrossMC";
-        public const string MappingFile = "bridge_v4.bin";
+        public const string MappingFile = "bridge_v5.bin";
         public const string ConfigDir = "config";
         public const string ConfigFile = "crossmc.properties";
         public const string ConfigKeyMappingPath = "mapping.path";
-        public const string DefaultMappingPath = "%LOCALAPPDATA%/CrossMC/bridge_v4.bin";
+        public const string DefaultMappingPath = "%LOCALAPPDATA%/CrossMC/bridge_v5.bin";
 
         // capabilities
         public const int CapFrame = 1 << 0;
@@ -27,15 +27,21 @@ namespace CrossMC.Bridge
         public const int CapInput = 1 << 5;
         public const int CapDepth = 1 << 6;
         public const int CapBlockEdit = 1 << 7;
+        public const int CapHostFrame = 1 << 8;
         public const int CapAll = CapFrame | CapState | CapEntity | CapCollision
-                | CapDamage | CapInput | CapDepth | CapBlockEdit;
+                | CapDamage | CapInput | CapDepth | CapBlockEdit | CapHostFrame;
 
         public const long HeartbeatTimeoutMs = 2000L;
 
         public const int MaxFrameW = 3840;
         public const int MaxFrameH = 2160;
-        public const int BytesPerPixel = 4; // BGRA8
+        public const int BytesPerPixel = 4; // BGRA8 / RGBA8
         public const long FrameSlotBytes = (long)MaxFrameW * MaxFrameH * BytesPerPixel;
+
+        // host frame (host -> Minecraft)
+        public const int MaxHostFrameW = 2560;
+        public const int MaxHostFrameH = 1440;
+        public const long HostFrameSlotBytes = (long)MaxHostFrameW * MaxHostFrameH * BytesPerPixel;
 
         // region offsets
         public const long OffHeader = 0x0000;
@@ -44,6 +50,8 @@ namespace CrossMC.Bridge
         public const long OffOverlayCtl = 0x0300;
         public const long OffOverlaySlots = 0x0340;
         public const long OffDepthFrame = 0x0400;
+        public const long OffHostFrameCtl = 0x0500;
+        public const long OffHostFrameSlots = 0x0540;
         public const long OffInputRing = 0x1000;
         public const long OffInputEvents = 0x1040;
         public const long OffColliders = 0x20000;
@@ -54,7 +62,8 @@ namespace CrossMC.Bridge
         public const long OffDamageEntries = OffDamage + 0x10;
         public const long OffBlockEdits = 0x80000;
         public const long OffFrames = 0x100000;
-        public const long MappingBytes = OffFrames + FrameSlotBytes * 3;
+        public const long OffHostFrameFrames = (OffFrames + FrameSlotBytes * 3 + 0xFFFFF) & ~0xFFFFF;
+        public const long MappingBytes = OffHostFrameFrames + HostFrameSlotBytes * 3;
 
         // struct sizes
         public const int HeaderSize = 0x50;
@@ -129,7 +138,14 @@ namespace CrossMC.Bridge
         public const int OverlayFresh = 1 << 2;
         public const int OverlayIndexMask = 0x3;
         public const int FormatBgra8 = 1;
+        public const int FormatRgba8 = 2;
         public const int OverlayBottomUp = 1 << 0;
+
+        // host-frame control (host -> MC), same encoding as the overlay control
+        public const long HostFrameCtlState = OffHostFrameCtl + 0;
+        public const long HostFrameCtlFramesPublished = OffHostFrameCtl + 8;
+        public const long HostFrameCtlSequence = OffHostFrameCtl + 16;
+        public const long HostFrameCtlTimestamp = OffHostFrameCtl + 24;
 
         // collider kinds
         public const int ColliderBox = 1;
@@ -165,5 +181,7 @@ namespace CrossMC.Bridge
 
         public static long SlotHdr(int i) => OffOverlaySlots + (long)i * OverlaySlotSize;
         public static long SlotPixels(int i) => OffFrames + (long)i * FrameSlotBytes;
+        public static long HostFrameSlotHdr(int i) => OffHostFrameSlots + (long)i * OverlaySlotSize;
+        public static long HostFrameSlotPixels(int i) => OffHostFrameFrames + (long)i * HostFrameSlotBytes;
     }
 }

@@ -21,6 +21,9 @@ namespace CrossMC.Bridge
         private readonly MemoryMappedViewAccessor _view;
         private readonly byte* _base;
         private int _front;
+        private int _hostFrameBack = 2;   // host-frame writer's private back slot (host -> MC)
+        private long _hostFrameId;
+        private long _hostFramePublished;
 
         private BridgeMemory(MemoryMappedFile mmf, MemoryMappedViewAccessor view)
         {
@@ -121,11 +124,65 @@ namespace CrossMC.Bridge
         public void InitTripleBuffer()
         {
             _front = 0;
+            _hostFrameBack = 2;
             WriteI32(Protocol.CtlState, 1);
             WriteI64(Protocol.CtlFramesPublished, 0);
             WriteI64(Protocol.OffOverlayCtl + 16, 0);
             WriteI64(Protocol.OffOverlayCtl + 24, 0);
+
+            // Host-frame (host -> MC) triple buffer: this side is the writer.
+            WriteI32(Protocol.HostFrameCtlState, 1);
+            WriteI64(Protocol.HostFrameCtlFramesPublished, 0);
+            WriteI64(Protocol.HostFrameCtlSequence, 0);
+            WriteI64(Protocol.HostFrameCtlTimestamp, 0);
         }
+
+        /// <summary>
+        /// Writer side (host): publishes one packed 4-byte-per-pixel frame into the host-frame triple
+        /// buffer (host -> Minecraft). <paramref name="format"/> is <see cref="Protocol.FormatRgba8"/>
+        /// or <see cref="Protocol.FormatBgra8"/>. Never blocks the reader; the reader is expected to
+        /// honor the published <c>format</c>.
+        /// </summary>
+        public void PublishHostFrame(byte[] pixels, int width, int height, int format, int flags)
+        {
+            if (width <= 0 || height <= 0 || width > Protocol.MaxHostFrameW || height > Protocol.MaxHostFrameH)
+            {
+                throw new ArgumentException("host frame size out of range: " + width + "x" + height);
+            }
+
+            int stride = width * Protocol.BytesPerPixel;
+            int need = stride * height;
+
+            if (pixels.Length < need)
+            {
+                throw new ArgumentException("host frame buffer too small: " + pixels.Length + " < " + need);
+            }
+
+            int slot = _hostFrameBack;
+            Marshal.Copy(pixels, 0, (IntPtr)P(Protocol.HostFrameSlotPixels(slot)), need);
+
+            long hdr = Protocol.HostFrameSlotHdr(slot);
+            long frameId = ++_hostFrameId;
+            long now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+            WriteI32(hdr + 0, width);
+            WriteI32(hdr + 4, height);
+            WriteI32(hdr + 8, stride);
+            WriteI32(hdr + 12, format);
+            WriteI32(hdr + 16, flags);
+            WriteI32(hdr + 20, slot);
+            WriteI64(hdr + 24, frameId);
+            WriteI64(hdr + 32, frameId);
+            WriteI64(hdr + 40, now);
+
+            int old = Interlocked.Exchange(ref *(int*)P(Protocol.HostFrameCtlState), slot | Protocol.OverlayFresh);
+            _hostFrameBack = old & Protocol.OverlayIndexMask;
+
+            WriteI64(Protocol.HostFrameCtlFramesPublished, ++_hostFramePublished);
+            WriteI64(Protocol.HostFrameCtlSequence, frameId);
+            WriteI64(Protocol.HostFrameCtlTimestamp, now);
+        }
+
+        public long HostFrameFramesPublished() => ReadI64(Protocol.HostFrameCtlFramesPublished);
 
         /// <summary>Host side: newest ready slot, or -1 if no fresh frame.</summary>
         public int Acquire()

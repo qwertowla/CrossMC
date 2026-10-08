@@ -27,7 +27,7 @@ CrossMC 是**框架**仓库。每个宿主适配器都是**独立的同级仓库
 
 ```text
 CrossMC/
-├─ protocol/bridge_protocol.h     # 共享内存布局的唯一真相源（v4）
+├─ protocol/bridge_protocol.h     # 共享内存布局的唯一真相源（v5）
 ├─ bindings/
 │  ├─ java/                       # Minecraft 模组使用的薄运行时
 │  └─ csharp/                     # C# 宿主使用的薄运行时
@@ -52,7 +52,7 @@ CrossMC/
 
 ## 框架提供什么
 
-- **协议**（`protocol/bridge_protocol.h`，v4）——C-compatible 字节布局：能力位、心跳、
+- **协议**（`protocol/bridge_protocol.h`，v5）——C-compatible 字节布局：能力位、心跳、
   `HostState`/`McState` seqlock、overlay **三缓冲**、`ColliderTable`（id + revision + 生命周期）、
   带稳定 **`CrossEntityId`** 的 `EntityTable`、原生伤害 `DamageRing`、`InputRing`，以及预留的
   `DepthFrame`/`BlockEditRing`。详见 `docs/PROTOCOL.md`。
@@ -68,7 +68,7 @@ CrossMC/
 ## 配置
 
 `config/crossmc.properties` 控制共享内存的位置（`mapping.path`）。两个进程必须解析到同一个绝对路径。
-值支持 `%VAR%` 占位符与前导 `~`，例如 `%LOCALAPPDATA%/CrossMC/bridge_v4.bin`。
+值支持 `%VAR%` 占位符与前导 `~`，例如 `%LOCALAPPDATA%/CrossMC/bridge_v5.bin`。
 
 配置文件的查找顺序（先匹配者优先）：
 

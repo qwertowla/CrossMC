@@ -1,4 +1,4 @@
-/* bridge_protocol.h — CrossMC shared-memory protocol (draft v4)
+/* bridge_protocol.h — CrossMC shared-memory protocol (draft v5)
  *
  * This header is the SINGLE SOURCE OF TRUTH for the byte layout. The C# binding
  * (bindings/csharp) and the Java binding (bindings/java) mirror it. If anything here
@@ -17,7 +17,7 @@
  * ------------
  * * SHARED MEMORY IS FILE-BACKED. The Java (Minecraft) side cannot open Win32 named
  *   sections (Local\...); it can only map a file. So both processes map the same file
- *   (default %LOCALAPPDATA%\CrossMC\bridge_v4.bin, configurable through
+ *   (default %LOCALAPPDATA%\CrossMC\bridge_v5.bin, configurable through
  *   config/crossmc.properties -> mapping.path). This is real cross-process shared memory
  *   (the OS page cache backs both mappings); it is just addressed by path.
  * * All multi-byte values are little-endian. Fixed-size POD structs only; no
@@ -29,8 +29,8 @@
  *     - triple buffer: frames (lock-free, never blocks, never tears)
  *
  * Scope: one host game at a time. Payload maturity:
- *   implemented      : frame (overlay triple buffer), HostState/McState, ColliderTable,
- *                      EntityTable, DamageRing
+ *   implemented      : frame (MC -> host overlay triple buffer), host frame (host -> MC triple
+ *                      buffer), HostState/McState, ColliderTable, EntityTable, DamageRing
  *   reserved / basic : InputRing, DepthFrame, BlockEditRing
  * Concrete host adapters (e.g. HowToFishMC) live in separate repositories and never change
  * this layout.
@@ -56,10 +56,11 @@ CROSSMC_EXTERN_C_BEGIN
 /* ---- identity ---------------------------------------------------------------------- */
 /* "CMCB" (CrossMC Bridge), little-endian bytes 'C','M','C','B'. */
 #define CROSSMC_MAGIC   0x42434D43u
-#define CROSSMC_VERSION 4u
+#define CROSSMC_VERSION 5u
 /* Default file-backed mapping (relative to %LOCALAPPDATA%). Overridden by
- * config/crossmc.properties -> mapping.path; both processes must resolve the same file. */
-#define CROSSMC_MAPPING_SUBPATH L"CrossMC\\bridge_v4.bin"
+ * config/crossmc.properties -> mapping.path; both processes must resolve the same file.
+ * v5 adds the HostFrame (host -> Minecraft) triple buffer. */
+#define CROSSMC_MAPPING_SUBPATH L"CrossMC\\bridge_v5.bin"
 
 /* ---- capabilities ---------------------------------------------------------------- *
  * A lightweight feature bitmask each peer advertises in the header. A feature is active
@@ -72,24 +73,36 @@ CROSSMC_EXTERN_C_BEGIN
 #define CROSSMC_CAP_INPUT      (1u << 5)
 #define CROSSMC_CAP_DEPTH      (1u << 6)
 #define CROSSMC_CAP_BLOCK_EDIT (1u << 7)
+/* Bidirectional video: the host can also publish frames to Minecraft (host-frame triple buffer). */
+#define CROSSMC_CAP_HOST_FRAME (1u << 8)
 #define CROSSMC_CAP_ALL       (CROSSMC_CAP_FRAME | CROSSMC_CAP_STATE | CROSSMC_CAP_ENTITY \
                              | CROSSMC_CAP_COLLISION | CROSSMC_CAP_DAMAGE | CROSSMC_CAP_INPUT \
-                             | CROSSMC_CAP_DEPTH | CROSSMC_CAP_BLOCK_EDIT)
+                             | CROSSMC_CAP_DEPTH | CROSSMC_CAP_BLOCK_EDIT | CROSSMC_CAP_HOST_FRAME)
 
 /* ---- frame geometry (v1 hard cap; pages are committed lazily by the OS) ------------- */
 #define CROSSMC_MAX_FRAME_W     3840u
 #define CROSSMC_MAX_FRAME_H     2160u
-#define CROSSMC_BYTES_PER_PIXEL 4u   /* BGRA8 */
+#define CROSSMC_BYTES_PER_PIXEL 4u   /* BGRA8 / RGBA8 */
 #define CROSSMC_FRAME_SLOT_BYTES \
 	((uint64_t)CROSSMC_MAX_FRAME_W * CROSSMC_MAX_FRAME_H * CROSSMC_BYTES_PER_PIXEL)
+
+/* HostFrame (host -> Minecraft) has its own triple buffer with a smaller hard cap: the host
+ * captures its camera at a modest resolution (see the adapter config), and a separate cap keeps
+ * the extra mapping size bounded. Same 4-byte pixel format as the overlay frame. */
+#define CROSSMC_HOSTFRAME_MAX_W     2560u
+#define CROSSMC_HOSTFRAME_MAX_H     1440u
+#define CROSSMC_HOSTFRAME_SLOT_BYTES \
+	((uint64_t)CROSSMC_HOSTFRAME_MAX_W * CROSSMC_HOSTFRAME_MAX_H * CROSSMC_BYTES_PER_PIXEL)
 
 /* ---- region offsets (bytes) -------------------------------------------------------- */
 #define CROSSMC_OFF_HEADER        0x0000   /* Header            */
 #define CROSSMC_OFF_HOST_STATE    0x0100   /* HostState  (host -> MC, seqlock)  */
 #define CROSSMC_OFF_MC_STATE      0x0200   /* McState    (MC  -> host, seqlock) */
-#define CROSSMC_OFF_OVERLAY_CTL   0x0300   /* OverlayControl (triple-buffer state) */
+#define CROSSMC_OFF_OVERLAY_CTL   0x0300   /* OverlayControl (MC -> host triple buffer) */
 #define CROSSMC_OFF_OVERLAY_SLOTS 0x0340   /* OverlayFrameSlot[3] (3 * 0x40) */
 #define CROSSMC_OFF_DEPTH_FRAME   0x0400   /* DepthFrame (reserved, Phase 4) */
+#define CROSSMC_OFF_HOSTFRAME_CTL   0x0500 /* HostFrameControl (host -> MC triple buffer) */
+#define CROSSMC_OFF_HOSTFRAME_SLOTS 0x0540 /* frame slot[3] (same 0x40 layout) */
 #define CROSSMC_OFF_INPUT_RING    0x1000   /* InputRing (reserved, Phase 3)  */
 #define CROSSMC_OFF_INPUT_EVENTS  0x1040   /* InputEvent[]                   */
 #define CROSSMC_OFF_COLLIDERS     0x20000  /* ColliderTable + Collider[]     */
@@ -100,9 +113,12 @@ CROSSMC_EXTERN_C_BEGIN
 #define CROSSMC_OFF_ENTITY_ENTRIES   (CROSSMC_OFF_ENTITIES + 0x20)
 #define CROSSMC_OFF_DAMAGE_ENTRIES   (CROSSMC_OFF_DAMAGE + 0x10)
 #define CROSSMC_OFF_BLOCK_EDIT_ENTRIES (CROSSMC_OFF_BLOCK_EDITS + 0x10)
-#define CROSSMC_OFF_FRAMES        0x100000 /* 1 MiB align; 3 pixel slabs     */
+#define CROSSMC_OFF_FRAMES        0x100000 /* 1 MiB align; 3 overlay pixel slabs */
+/* HostFrame slabs are appended after the overlay slabs, 1 MiB aligned. */
+#define CROSSMC_OFF_HOSTFRAME_FRAMES \
+	((CROSSMC_OFF_FRAMES + CROSSMC_FRAME_SLOT_BYTES * 3 + 0xFFFFFu) & ~(uint64_t)0xFFFFFu)
 #define CROSSMC_MAPPING_BYTES \
-	(CROSSMC_OFF_FRAMES + CROSSMC_FRAME_SLOT_BYTES * 3)
+	(CROSSMC_OFF_HOSTFRAME_FRAMES + CROSSMC_HOSTFRAME_SLOT_BYTES * 3)
 
 #define CROSSMC_HEARTBEAT_TIMEOUT_MS 2000u
 
@@ -240,8 +256,10 @@ CROSSMC_STATIC_ASSERT(sizeof(OverlayControl) == 0x20, "OverlayControl size");
 
 /* ---- per-slot frame metadata ------------------------------------------------------- */
 #define CROSSMC_FORMAT_BGRA8 1u      /* 4 bytes/pixel, B,G,R,A */
+#define CROSSMC_FORMAT_RGBA8 2u      /* 4 bytes/pixel, R,G,B,A (host capture readback) */
 
 #define CROSSMC_OVERLAY_BOTTOM_UP (1u << 0) /* rows are bottom-up; D3D readback is top-down */
+#define CROSSMC_FRAME_BOTTOM_UP   CROSSMC_OVERLAY_BOTTOM_UP
 
 typedef struct crossmc_overlay_frame_slot
 {
@@ -268,6 +286,35 @@ static inline uint64_t crossmc_overlay_slab(uint32_t i)
 static inline uint64_t crossmc_overlay_slot(uint32_t i)
 {
 	return CROSSMC_OFF_OVERLAY_SLOTS + (uint64_t)i * sizeof(OverlayFrameSlot);
+}
+
+/* ====================================================================================
+ * HostFrameControl @0x0500 — Host -> Minecraft, lock-free triple buffer (independent of the
+ * overlay buffer). The HOST is the writer, MINECRAFT the reader. Same state encoding as
+ * OverlayControl. Both processes must not share the overlay writer slot; this is a second,
+ * separate producer/consumer pair.
+ *
+ * Slot headers reuse {@link OverlayFrameSlot} (same 0x40 layout) at CROSSMC_OFF_HOSTFRAME_SLOTS;
+ * pixel slabs follow the overlay slabs at CROSSMC_OFF_HOSTFRAME_FRAMES.
+ * ==================================================================================== */
+typedef struct crossmc_host_frame_control
+{
+	uint32_t state;              /* same encoding as OverlayControl.state */
+	uint32_t reserved0;
+	uint64_t framesPublished;
+	uint64_t sequence;
+	uint64_t timestampMs;
+} HostFrameControl;
+CROSSMC_STATIC_ASSERT(sizeof(HostFrameControl) == 0x20, "HostFrameControl size");
+
+static inline uint64_t crossmc_hostframe_slab(uint32_t i)
+{
+	return CROSSMC_OFF_HOSTFRAME_FRAMES + (uint64_t)i * CROSSMC_HOSTFRAME_SLOT_BYTES;
+}
+
+static inline uint64_t crossmc_hostframe_slot(uint32_t i)
+{
+	return CROSSMC_OFF_HOSTFRAME_SLOTS + (uint64_t)i * sizeof(OverlayFrameSlot);
 }
 
 /* ====================================================================================

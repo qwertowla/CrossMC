@@ -31,7 +31,7 @@ and is the only place game-specific code lives.
 
 ```text
 CrossMC/
-├─ protocol/bridge_protocol.h     # single source of truth for the shared-memory layout (v4)
+├─ protocol/bridge_protocol.h     # single source of truth for the shared-memory layout (v5)
 ├─ bindings/
 │  ├─ java/                       # thin runtime used by the Minecraft mod
 │  └─ csharp/                     # thin runtime used by C# host adapters
@@ -57,7 +57,7 @@ CrossMC/
 
 ## What the framework provides
 
-- **Protocol** (`protocol/bridge_protocol.h`, v4) — C-compatible byte layout: capability bitmasks,
+- **Protocol** (`protocol/bridge_protocol.h`, v5) — C-compatible byte layout: capability bitmasks,
   heartbeats, `HostState`/`McState` seqlocks, an overlay **triple buffer**, a `ColliderTable`
   (id + revision + lifecycle), an `EntityTable` with a stable **`CrossEntityId`**, a native-damage
   `DamageRing`, an `InputRing`, and reserved `DepthFrame`/`BlockEditRing`. See `docs/PROTOCOL.md`.
@@ -76,7 +76,7 @@ CrossMC/
 
 `config/crossmc.properties` controls where the shared memory lives (`mapping.path`). Both processes
 must resolve the same absolute file. The value supports `%VAR%` placeholders and a leading `~`, e.g.
-`%LOCALAPPDATA%/CrossMC/bridge_v4.bin`.
+`%LOCALAPPDATA%/CrossMC/bridge_v5.bin`.
 
 The config file is found in this order (first match wins):
 
@@ -95,6 +95,7 @@ So the Minecraft mod always has a working default from its own jar; a user file 
 | Capability | Protocol | Minecraft side | Host adapter |
 |---|---|---|---|
 | Frame | ✅ | ✅ producer | ✅ (HowToFishMC overlay) |
+| Host frame (host→MC) | ✅ | ✅ consumer → world-space quad | ✅ camera capture (HowToFishMC) |
 | State (`HostState`/`McState`) | ✅ | ✅ publishes `McState` | ✅ publishes `HostState` |
 | Collision (`ColliderTable`) | ✅ | ✅ proxies via `World#getBlockState` | ✅ exports colliders |
 | Entity (`CrossEntityId`) | ✅ | ✅ proxy entities + damage | ✅ allocates ids |
