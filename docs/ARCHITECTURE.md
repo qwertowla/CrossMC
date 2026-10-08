@@ -9,7 +9,7 @@
 ## 1. Positioning
 
 CrossMC is a general **Minecraft ↔ standalone host game** cross-process bridge framework, not a
-single-game mod. How to Fish is the first host adapter (`hosts/HowToFish/`).
+single-game mod. How to Fish is the first host adapter (the `HowToFishMC` repository).
 
 ```text
                 ┌─ HowToFish        (first host adapter, only one for now)
@@ -56,7 +56,7 @@ HowToFish.exe (Unity 6 / Mono / BepInEx)         javaw.exe (Minecraft 1.21.1 / F
 
 - **Minecraft side (`minecraft/`)** is mostly game-independent: it produces frames (and later
   state) and consumes host state/input.
-- **Host side (`hosts/<Game>/`)** is fully game-specific.
+- **Host side** (its own sibling repository, e.g. `HowToFishMC`) is fully game-specific.
 
 ### Roles and player/camera ownership
 
@@ -92,22 +92,24 @@ Consequences:
 
 ## 5. Repository layout
 
-One repository. Game-independent code at the top level; each host adapter under `hosts/`.
+One repository holds the **game-independent framework**; each host adapter is a **separate sibling
+repository** that depends on it.
 
 ```text
-CrossMC/  (branch: main)
+CrossMC/                         framework repository
 ├─ protocol/bridge_protocol.h
 ├─ bindings/{java,csharp}/
 ├─ minecraft/
-├─ hosts/README.md             host adapters live on per-host branches (not here)
 ├─ docs/{ARCHITECTURE,PORTING,ROADMAP,VERIFICATION}.md
 ├─ LICENSE
 └─ README.md
+
+HowToFishMC/                     first host adapter repository (sibling)
+└─ src/ + host.properties + CrossMC.HowToFish.csproj  (references ../CrossMC/bindings/csharp)
 ```
 
-`main` is the **game-independent framework**. Each host adapter is developed on its own branch
-and checked out as a sibling worktree, e.g. `HowToFishMC` at `CrossMC/HowToFishMC` containing
-`hosts/HowToFish/`. See `hosts/README.md`.
+Future hosts get their own sibling repositories (`EldenRingMC`, `SkyrimMC`, ...). CrossMC itself
+stays game-agnostic and owns the protocol, bindings and Minecraft mod.
 
 ---
 
@@ -243,13 +245,13 @@ host entity (FishNet NetworkObject.ObjectId)  ↔  EntityTable  ↔  Minecraft p
 ```text
 MC native damage (melee / projectile / explosion / fall / fire / modded)
         ↓  ServerLivingEntityEvents.AFTER_DAMAGE (only proxy entities)
-DamageRing (SPSC)  →  host adapter  →  multiplier from hosts/<Game>  →  host entity effect
+DamageRing (SPSC)  →  host adapter  →  multiplier from the host repo config  →  host entity effect
 ```
 
 - Minecraft forwards the **real** damage event (amount, source kind, attacker, position), not an
   explosion coordinate.
-- Multipliers and how a host entity reacts live in `hosts/<Game>` configuration, never in
-  `protocol/`.
+- Multipliers and how a host entity reacts live in the host adapter repository's configuration
+  (e.g. `HowToFishMC/host.properties`), never in `protocol/`.
 - Reverse direction (Minecraft blocks constraining host entities) is reserved as `BlockEditRing`.
 
 ### 12.4 Status

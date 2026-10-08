@@ -8,8 +8,8 @@
 与一个**独立的宿主游戏**连接起来。两个进程通过共享内存交换渲染帧、状态与输入：Minecraft 作为渲染 /
 工具侧，宿主游戏负责显示与合成。
 
-第一个宿主实现是 **CrossMC-HowToFish**（位于 `hosts/HowToFish/`）：它把 Minecraft 渲染出的画面
-合成进 **How to Fish**（Unity 6 / Mono / BepInEx）。
+第一个宿主实现是 **HowToFishMC** —— 一个独立的同级仓库：它把 Minecraft 渲染出的画面合成进
+**How to Fish**（Unity 6 / Mono / BepInEx）。
 
 **CrossMC 目前主要面向 Minecraft 1.21.1 + Fabric**，这是现阶段唯一支持的 Minecraft 环境。
 
@@ -31,8 +31,8 @@ Minecraft ─ Core ─┤─ <未来的宿主>
 
 ## 目录结构
 
-单仓库。框架（协议 + bindings + Minecraft 模组）与游戏无关；每个宿主适配器放在 `hosts/` 下，是唯一
-的游戏相关代码。
+框架单独一个仓库。框架（协议 + bindings + Minecraft 模组）与游戏无关；每个宿主适配器是**独立的同级
+仓库**（例如 `HowToFishMC`），是唯一的游戏相关代码。
 
 ```text
 CrossMC/
@@ -41,7 +41,6 @@ CrossMC/
 │  ├─ java/                       # Minecraft 模组使用的薄运行时（已实现）
 │  └─ csharp/                     # C# 宿主使用的薄运行时（占位）
 ├─ minecraft/                     # Fabric 模组（基本与游戏无关）
-├─ hosts/                         # 宿主适配器在各宿主分支上（见 hosts/README.md）
 ├─ config/
 │  └─ crossmc.properties          # 配置（共享内存路径等）
 ├─ docs/
@@ -54,7 +53,8 @@ CrossMC/
 └─ README_ZH.md
 ```
 
-新宿主以 `hosts/<游戏>/`（例如 `hosts/EldenRing/`）加入，**不是**分支，**也不是**独立仓库。
+每个宿主适配器是独立的同级仓库（例如 `HowToFishMC`，以后 `EldenRingMC`），依赖本仓库。CrossMC 本身
+负责全部与游戏无关的逻辑。
 
 `bindings/cpp/` 暂**不创建**——等真正要移植第一个原生（非托管）宿主时再加。
 
@@ -114,7 +114,7 @@ Phase 0/1 固定：**仅 Windows**、**Minecraft 1.21.1 + Fabric**、**文件后
   都能感知宿主空间（不重写规则，也绝不遮挡真实方块）。
 - **实体。** 宿主生物通过稳定宿主实体 id（`NetworkObject.ObjectId`）映射为隐藏的 Minecraft 代理实体。
 - **伤害。** 代理实体上的 Minecraft 原生伤害事件（近战、投射物、爆炸/TNT、摔落、火焰、模组）会被转发
-  给宿主，由宿主按自己的规则/倍率处理。伤害倍率只存在于 `hosts/HowToFish`，绝不进 `protocol/`。
+  给宿主，由宿主按自己的规则/倍率处理。伤害倍率只存在于宿主适配器仓库（`HowToFishMC`），绝不进 `protocol/`。
 
 状态：各模块均能编译；尚未实机验证。详见 `docs/ARCHITECTURE.md` §12 与 `docs/ROADMAP.md`。
 

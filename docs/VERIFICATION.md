@@ -11,20 +11,23 @@
 
 ### 构建
 
+两个独立仓库（容器内同级）：`CrossMC\`（框架）与 `HowToFishMC\`（宿主适配器）。
+
 ```powershell
+# 1) CrossMC 框架
 # Minecraft（需要 JDK 25 跑 Gradle，模组目标 Java 21）
 $env:JAVA_HOME='<JDK 25 路径>'
 cd CrossMC\minecraft
 .\gradlew.bat clean build
 # -> build\libs\crossmc-fabric-0.1.0.jar
 
-# C# 绑定
+# C# 绑定（框架仓库内）
 cd ..\bindings\csharp
 dotnet build -c Release
 # -> bin\Release\netstandard2.1\CrossMC.Bindings.dll
 
-# HowToFish 插件（默认引用本机 Steam 安装；可 -p:GameDir=... 覆盖）
-cd ..\..\hosts\HowToFish
+# 2) HowToFishMC 宿主适配器（独立仓库，引用 ..\CrossMC 的绑定）
+cd ..\..\HowToFishMC
 dotnet build -c Release
 # -> bin\Release\CrossMC.HowToFish.dll
 ```
@@ -105,7 +108,7 @@ Remove-Item "$env:LOCALAPPDATA\CrossMC\bridge_v3.bin" -ErrorAction SilentlyConti
 
 ## 4. 碰撞代理（宿主 Collider → MC 原生碰撞）
 
-**操作**：把 MC 玩家移动到宿主某面墙/地形前（先在 `hosts/HowToFish/host.properties` 校准
+**操作**：把 MC 玩家移动到宿主某面墙/地形前（先在 `HowToFishMC\host.properties` 校准
 `transform.origin*`、`transform.scale`、`transform.flipX`，让宿主坐标对到 MC），尝试走进宿主空间。
 
 **预期**：MC 玩家被**挡住**（不可穿过），且周围的真实 MC 方块不受影响。

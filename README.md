@@ -10,7 +10,7 @@
 processes exchange rendered frames, state and input: Minecraft acts as the renderer/tool side, and
 the host game displays and composites it.
 
-The first host implementation is **CrossMC-HowToFish** (under `hosts/HowToFish/`): it composites
+The first host implementation is **HowToFishMC** — a separate sibling repository: it composites
 Minecraft's rendered frame into **How to Fish** (Unity 6 / Mono / BepInEx).
 
 **CrossMC is built primarily for Minecraft 1.21.1 + Fabric** — that is the only supported Minecraft
@@ -34,8 +34,9 @@ world/renderer. The bridge only **translates** between them.
 
 ## Layout
 
-One repository. The framework (protocol + bindings + Minecraft mod) is game-independent; each
-host adapter lives under `hosts/` and is the only game-specific code.
+One repository for the framework. The framework (protocol + bindings + Minecraft mod) is
+game-independent; each host adapter is a **separate repository** (e.g. `HowToFishMC`) and is the
+only game-specific code.
 
 ```text
 CrossMC/
@@ -44,7 +45,6 @@ CrossMC/
 │  ├─ java/                       # thin runtime used by the Minecraft mod (implemented)
 │  └─ csharp/                     # thin runtime used by C# hosts (placeholder)
 ├─ minecraft/                     # Fabric mod (mostly game-independent)
-├─ hosts/                         # host adapters live on per-host branches (see hosts/README.md)
 ├─ config/
 │  └─ crossmc.properties          # configuration (shared-memory path etc.)
 ├─ docs/
@@ -57,8 +57,8 @@ CrossMC/
 └─ README_ZH.md
 ```
 
-New hosts are added as `hosts/<Game>/` (e.g. `hosts/EldenRing/`), **not** as branches and **not**
-as separate repositories.
+Each host adapter is its own sibling repository (e.g. `HowToFishMC`, later `EldenRingMC`), depending
+on this one. CrossMC itself owns all the game-independent logic.
 
 `bindings/cpp/` is intentionally **not created** yet — it will be added only when a native
 (non-managed) host game is actually ported.
@@ -130,7 +130,7 @@ logical/rules side:
   (`NetworkObject.ObjectId`).
 - **Damage.** Minecraft's native damage events on those proxies (melee, projectile, explosion/TNT,
   fall, fire, modded) are forwarded to the host, which applies its own rules/multipliers. Damage
-  multipliers live in `hosts/HowToFish`, never in `protocol/`.
+  multipliers live in the host adapter repository (`HowToFishMC`), never in `protocol/`.
 
 Status: all modules build; in-game behaviour is not yet verified. See `docs/ARCHITECTURE.md` §12 and
 `docs/ROADMAP.md`.

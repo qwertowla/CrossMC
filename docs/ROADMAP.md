@@ -28,7 +28,7 @@ Minecraft Fabric
     ↓ FrameExporter                      [DONE — minecraft/]
 Shared Memory (file-backed, triple buffer)
     ↓
-How to Fish BepInEx                      [PENDING — hosts/HowToFish]
+How to Fish BepInEx                      [PENDING — HowToFishMC repo]
     ↓ Unity texture / overlay
 ```
 Success: a live rectangle in How to Fish showing Minecraft's rendered frame.
@@ -46,9 +46,8 @@ Progress (protocol v3):
   path bundled in the jar), `McState` publisher, host-collision proxies via
   `World#getBlockState` mixin, hidden armor-stand entity proxies on the integrated server, and
   native damage capture (`ServerLivingEntityEvents.AFTER_DAMAGE`).
-- **Host adapter** (`hosts/HowToFish`, on the **`HowToFishMC`** branch — not on `main`) — builds:
-  frame overlay, HostState/collider/entity export, damage consumption with `host.properties`
-  multipliers.
+- **Host adapter** (`HowToFishMC` repository — separate from this one) — builds: frame overlay,
+  HostState/collider/entity export, damage consumption with `host.properties` multipliers.
 - **Not verified in-game yet**: frame content/orientation, collision proxy movement, proxy
   entity binding, damage application (especially `Creature.LocalHit`). See the adapter README.
 

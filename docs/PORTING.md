@@ -12,13 +12,12 @@
 The adapter is the game-specific half of the bridge. It knows how to talk to one specific game.
 
 ```text
-protocol/ + bindings/    game-independent        (branch main)
-minecraft/               mostly game-independent   (branch main)
-hosts/<Game>/            fully game-specific adapter (its own per-host branch/worktree)
+CrossMC/         game-independent framework (protocol + bindings + minecraft)
+HowToFishMC/     fully game-specific adapter   (its own sibling repository)
 ```
 
-The adapter does **not** live on `main`; create a per-host branch (e.g. `HowToFishMC`) and put the
-adapter under `hosts/<Game>/` there. See `hosts/README.md`.
+The adapter lives in its **own repository** (e.g. `HowToFishMC`), depending on CrossMC. New games
+get new sibling repositories (`EldenRingMC`, ...).
 
 ---
 
@@ -116,4 +115,4 @@ Derived from the reference projects. For a managed/Unity host most rows are chea
 ## 7. Non-goals for this document (Phase 0)
 
 No plugin discovery, no cross-language adapter ABI, no capability registry in code.
-`hosts/HowToFish/` may look adapter-specific for a long time — that is correct.
+The How to Fish adapter repository may look adapter-specific for a long time — that is correct.
