@@ -48,7 +48,8 @@ CrossMC/
 ├─ docs/
 │  ├─ ARCHITECTURE.md
 │  ├─ PORTING.md
-│  └─ ROADMAP.md
+│  ├─ ROADMAP.md
+│  └─ VERIFICATION.md
 ├─ LICENSE
 ├─ README.md
 └─ README_ZH.md
