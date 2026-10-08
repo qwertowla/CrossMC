@@ -29,9 +29,9 @@ import java.nio.file.Path;
 public final class BridgeMemory implements Closeable {
 	// Atomic views over the mapped bytes. Index is a BYTE offset.
 	private static final VarHandle STATE =
-			MethodHandles.byteBufferViewVarHandle(int[].class, ByteOrder.nativeOrder());
+			MethodHandles.byteBufferViewVarHandle(int[].class, ByteOrder.LITTLE_ENDIAN);
 	private static final VarHandle SEQ =
-			MethodHandles.byteBufferViewVarHandle(int[].class, ByteOrder.nativeOrder());
+			MethodHandles.byteBufferViewVarHandle(int[].class, ByteOrder.LITTLE_ENDIAN);
 
 	private static final int SEQ_RETRIES = 256;
 
@@ -64,6 +64,9 @@ public final class BridgeMemory implements Closeable {
 		}
 
 		MappedByteBuffer map = channel.map(FileChannel.MapMode.READ_WRITE, 0, Protocol.MAPPING_BYTES);
+		// The protocol is LITTLE-ENDIAN. A MappedByteBuffer defaults to BIG_ENDIAN, which made the
+		// Java (Minecraft) side write a different byte order than the C# side read/write.
+		map.order(ByteOrder.LITTLE_ENDIAN);
 		return new BridgeMemory(raf, channel, map);
 	}
 

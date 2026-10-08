@@ -31,6 +31,17 @@ public final class ShmSelfTest {
 			try (BridgeMemory reader = BridgeMemory.open()) {
 				check(reader.hasValidHeader(), "reader sees a valid header");
 
+				// Byte-order guard: the protocol is little-endian, so the magic bytes must be
+				// 43 4D 43 42 ('C','M','C','B'). This catches a BIG_ENDIAN ByteBuffer regression
+				// (which Java's MappedByteBuffer defaults to and the C# side would misread).
+				byte[] magicBytes = new byte[4];
+				try (java.io.RandomAccessFile raf = new java.io.RandomAccessFile(path.toFile(), "r")) {
+					raf.readFully(magicBytes);
+				}
+				check(magicBytes[0] == 0x43 && magicBytes[1] == 0x4D
+						&& magicBytes[2] == 0x43 && magicBytes[3] == 0x42,
+						"header magic is little-endian (43 4D 43 42)");
+
 				check(reader.acquire() == -1, "no frame before first publish");
 
 				byte[] a = pattern(4, 2, 0x10);
