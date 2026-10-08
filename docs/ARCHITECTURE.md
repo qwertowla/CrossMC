@@ -187,8 +187,10 @@ Full semantics live in `docs/PROTOCOL.md`; the essentials:
 - **Player authority**: **the Minecraft player is authoritative** (position, velocity, rotation,
   jump, gravity, collision — all decided by Minecraft, including collisions with host proxies). The
   host player is a *representation* that follows `McState`. The host → Minecraft player channel is
-  **`InputRing`** (the host captures keys/mouse); the host transform is **never** written back onto
-  the Minecraft player. `HostState` only carries host environment/avatar info (informational).
+  **`InputRing`** (the host captures keys/mouse). Minecraft injects it into its **own** input system
+  (`KeyBinding`/`Mouse`), so its native movement/physics/collision still run — there is no custom
+  movement controller. The host transform is **never** written back onto the Minecraft player;
+  `HostState` only carries host environment/avatar info (informational).
 - **Authority**: Minecraft owns the player/blocks/entity rules; the host owns host entities and
   colliders; CrossMC only transports.
 

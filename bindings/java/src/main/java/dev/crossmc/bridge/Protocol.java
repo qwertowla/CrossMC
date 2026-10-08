@@ -152,6 +152,18 @@ public final class Protocol {
 	public static final int INPUT_CURSOR_POS = 8;
 	public static final int INPUT_RELEASE_ALL = 9;
 
+	// ---- keyboard semantics for INPUT_KEY_* events (InputEvent.code) ----
+	public static final int KEY_FORWARD = 1;
+	public static final int KEY_BACK = 2;
+	public static final int KEY_LEFT = 3;
+	public static final int KEY_RIGHT = 4;
+	public static final int KEY_JUMP = 5;
+	public static final int KEY_SNEAK = 6;
+	public static final int KEY_SPRINT = 7;
+	public static final int KEY_INVENTORY = 8;
+	public static final int KEY_DROP = 9;
+	public static final int KEY_SWAP_HANDS = 10;
+
 	// Header field offsets
 	public static final long HDR_MAGIC = OFF_HEADER + 0L;
 	public static final long HDR_VERSION = OFF_HEADER + 4L;

@@ -96,6 +96,18 @@ namespace CrossMC.Bridge
         public const int InputCursorPos = 8;
         public const int InputReleaseAll = 9;
 
+        // keyboard semantics for InputKey* events (InputEvent.Code)
+        public const int KeyForward = 1;
+        public const int KeyBack = 2;
+        public const int KeyLeft = 3;
+        public const int KeyRight = 4;
+        public const int KeyJump = 5;
+        public const int KeySneak = 6;
+        public const int KeySprint = 7;
+        public const int KeyInventory = 8;
+        public const int KeyDrop = 9;
+        public const int KeySwapHands = 10;
+
         // header fields
         public const long HdrMagic = OffHeader + 0;
         public const long HdrVersion = OffHeader + 4;

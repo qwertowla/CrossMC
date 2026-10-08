@@ -4,31 +4,33 @@ import dev.crossmc.bridge.BridgeMemory;
 import dev.crossmc.bridge.InputEvent;
 import dev.crossmc.bridge.Protocol;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
+import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.option.GameOptions;
+import net.minecraft.client.option.KeyBinding;
+import net.minecraft.client.util.InputUtil;
 
 /**
- * Consumes the CrossMC {@code InputRing} (host -> Minecraft).
+ * Consumes the CrossMC {@code InputRing} (host -> Minecraft) and injects it into Minecraft's own
+ * input system — no custom movement/physics.
  *
- * <p>This is the Host -> Minecraft player channel: the host only <b>captures</b> keyboard/mouse
- * input; Minecraft decides what it means. The consumer keeps a held-key / held-button state,
- * accumulates mouse delta and wheel, de-duplicates by {@code sequence}, honours
- * {@link Protocol#INPUT_RELEASE_ALL}, and clears everything when the host disconnects — so no key
- * can get stuck.
+ * <p>Keyboard: {@link KeyBinding#setPressed(boolean)} on Minecraft's real bindings
+ * ({@code options.forwardKey}, ...), so {@code KeyboardInput.tick} + the native player tick compute
+ * movement exactly as for a physical key. Mouse buttons: {@link KeyBinding#setKeyPressed} +
+ * {@link KeyBinding#onKeyPressed} for the attack/use/pick bindings. Mouse look: the accumulated
+ * delta is fed into {@code Mouse.cursorDeltaX/Y} by {@code MouseMixin}, so vanilla applies its own
+ * sensitivity before {@code changeLookDirection}.
  *
- * <p><b>Status:</b> the ring is fully consumed into a typed {@link #isKeyHeld(int)} state here, but
- * it is <b>not yet applied</b> to the Minecraft player (that is the next step: translate this state
- * into Minecraft's own input/movement). The Minecraft player therefore remains driven by real
- * Minecraft input; McState stays authoritative.
+ * <p>Lifecycle safety: held keys/buttons are tracked, {@link Protocol#INPUT_RELEASE_ALL} clears
+ * them, and they are released automatically when the host is not alive or a GUI is open — so a host
+ * crash can never leave W / Space / a mouse button stuck.
  */
 public final class HostInputConsumer {
 	private static final HostInputConsumer INSTANCE = new HostInputConsumer();
 
 	private final IntOpenHashSet heldKeys = new IntOpenHashSet();
 	private final IntOpenHashSet heldButtons = new IntOpenHashSet();
-	private int mouseDx;
-	private int mouseDy;
-	private int wheel;
-	private int cursorX = -1;
-	private int cursorY = -1;
+	private volatile double mouseDx;
+	private volatile double mouseDy;
 	private long lastSequence;
 	private boolean hadInput;
 
@@ -39,18 +41,20 @@ public final class HostInputConsumer {
 		return INSTANCE;
 	}
 
-	/** Client thread: drains the ring and updates the input state. */
-	public void tick(BridgeMemory memory) {
-		if (memory == null) {
+	/** Client thread. {@code client} is used to reach the real options/player. */
+	public void tick(MinecraftClient client, BridgeMemory memory) {
+		if (memory == null || client.options == null) {
+			return;
+		}
+
+		// A GUI is open: host input must not drive the player; release anything we hold.
+		if (client.currentScreen != null) {
+			releaseAll(client.options);
 			return;
 		}
 
 		if (!memory.hostAlive(System.currentTimeMillis())) {
-			if (!heldKeys.isEmpty() || !heldButtons.isEmpty()) {
-				clear();
-				CrossMcMinecraft.LOGGER.info("CrossMC: host gone — host input released");
-			}
-
+			releaseAll(client.options);
 			return;
 		}
 
@@ -62,45 +66,102 @@ public final class HostInputConsumer {
 			}
 
 			if (event.sequence != 0 && event.sequence <= lastSequence) {
-				continue; // already seen (ring wrap / duplicate)
+				continue; // already seen (wrap / duplicate)
 			}
 
 			lastSequence = Math.max(lastSequence, event.sequence);
-			apply(event);
+			apply(client, client.options, event);
 		}
 	}
 
-	private void apply(InputEvent event) {
+	private void apply(MinecraftClient client, GameOptions options, InputEvent event) {
 		if (!hadInput) {
 			hadInput = true;
-			CrossMcMinecraft.LOGGER.info("CrossMC: receiving host input");
+			CrossMcMinecraft.LOGGER.info("CrossMC: injecting host input into Minecraft");
 		}
 
 		switch (event.type) {
-			case Protocol.INPUT_KEY_DOWN, Protocol.INPUT_KEY_HOLD -> heldKeys.add(event.code);
-			case Protocol.INPUT_KEY_UP -> heldKeys.remove(event.code);
-			case Protocol.INPUT_MOUSE_DOWN -> heldButtons.add(event.code);
-			case Protocol.INPUT_MOUSE_UP -> heldButtons.remove(event.code);
+			case Protocol.INPUT_KEY_DOWN, Protocol.INPUT_KEY_HOLD -> {
+				KeyBinding binding = bindingFor(options, event.code);
+
+				if (binding != null) {
+					binding.setPressed(true);
+					heldKeys.add(event.code);
+				}
+			}
+			case Protocol.INPUT_KEY_UP -> {
+				KeyBinding binding = bindingFor(options, event.code);
+
+				if (binding != null) {
+					binding.setPressed(false);
+					heldKeys.remove(event.code);
+				}
+			}
+			case Protocol.INPUT_MOUSE_DOWN -> {
+				InputUtil.Key key = InputUtil.Type.MOUSE.createFromCode(event.code);
+				KeyBinding.setKeyPressed(key, true);
+				KeyBinding.onKeyPressed(key);
+				heldButtons.add(event.code);
+			}
+			case Protocol.INPUT_MOUSE_UP -> {
+				KeyBinding.setKeyPressed(InputUtil.Type.MOUSE.createFromCode(event.code), false);
+				heldButtons.remove(event.code);
+			}
 			case Protocol.INPUT_MOUSE_MOVE -> {
 				mouseDx += event.a;
 				mouseDy += event.b;
 			}
-			case Protocol.INPUT_MOUSE_WHEEL -> wheel += event.a;
-			case Protocol.INPUT_CURSOR_POS -> {
-				cursorX = event.a;
-				cursorY = event.b;
+			case Protocol.INPUT_MOUSE_WHEEL -> {
+				if (client.player != null) {
+					client.player.getInventory().scrollInHotbar(Math.signum((double) event.a));
+				}
 			}
-			case Protocol.INPUT_RELEASE_ALL -> clear();
+			case Protocol.INPUT_CURSOR_POS -> {
+				// Recorded for future UI use; not applied to the player.
+			}
+			case Protocol.INPUT_RELEASE_ALL -> releaseAll(options);
 			default -> CrossMcMinecraft.LOGGER.debug("CrossMC: unknown input type {}", event.type);
 		}
 	}
 
-	private void clear() {
-		heldKeys.clear();
-		heldButtons.clear();
-		mouseDx = 0;
-		mouseDy = 0;
-		wheel = 0;
+	/** Maps a CrossMC keyboard semantic to the real Minecraft binding. */
+	private static KeyBinding bindingFor(GameOptions options, int code) {
+		return switch (code) {
+			case Protocol.KEY_FORWARD -> options.forwardKey;
+			case Protocol.KEY_BACK -> options.backKey;
+			case Protocol.KEY_LEFT -> options.leftKey;
+			case Protocol.KEY_RIGHT -> options.rightKey;
+			case Protocol.KEY_JUMP -> options.jumpKey;
+			case Protocol.KEY_SNEAK -> options.sneakKey;
+			case Protocol.KEY_SPRINT -> options.sprintKey;
+			case Protocol.KEY_INVENTORY -> options.inventoryKey;
+			case Protocol.KEY_DROP -> options.dropKey;
+			case Protocol.KEY_SWAP_HANDS -> options.swapHandsKey;
+			default -> null;
+		};
+	}
+
+	/** Releases every key/button CrossMC injected (disconnect, GUI open, RELEASE_ALL). */
+	private void releaseAll(GameOptions options) {
+		if (!heldKeys.isEmpty()) {
+			for (int code : heldKeys) {
+				KeyBinding binding = bindingFor(options, code);
+
+				if (binding != null) {
+					binding.setPressed(false);
+				}
+			}
+
+			heldKeys.clear();
+		}
+
+		if (!heldButtons.isEmpty()) {
+			for (int code : heldButtons) {
+				KeyBinding.setKeyPressed(InputUtil.Type.MOUSE.createFromCode(code), false);
+			}
+
+			heldButtons.clear();
+		}
 	}
 
 	public boolean isKeyHeld(int code) {
@@ -111,29 +172,16 @@ public final class HostInputConsumer {
 		return heldButtons.contains(code);
 	}
 
-	public int cursorX() {
-		return cursorX;
-	}
-
-	public int cursorY() {
-		return cursorY;
-	}
-
-	public int drainMouseDx() {
-		int value = mouseDx;
+	/** Drains the accumulated host mouse delta (consumed by {@code MouseMixin}). */
+	public double drainMouseDx() {
+		double value = mouseDx;
 		mouseDx = 0;
 		return value;
 	}
 
-	public int drainMouseDy() {
-		int value = mouseDy;
+	public double drainMouseDy() {
+		double value = mouseDy;
 		mouseDy = 0;
-		return value;
-	}
-
-	public int drainWheel() {
-		int value = wheel;
-		wheel = 0;
 		return value;
 	}
 }

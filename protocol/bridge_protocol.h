@@ -282,6 +282,21 @@ static inline uint64_t crossmc_overlay_slot(uint32_t i)
 #define CROSSMC_INPUT_CURSOR_POS  8u  /* a,b = absolute x,y (screen pixels)     */
 #define CROSSMC_INPUT_RELEASE_ALL 9u  /* clear all held keys/buttons            */
 
+/* Keyboard key semantics for CROSSMC_INPUT_KEY_* events (InputEvent.code). A host maps its own
+ * keys (e.g. Unity `Key`) to these; Minecraft maps them to its own KeyBindings. This keeps the
+ * wire format independent of any engine's key numbering. Mouse buttons use CROSSMC_INPUT_MOUSE_*
+ * with code = 0 left / 1 right / 2 middle. */
+#define CROSSMC_KEY_FORWARD    1u     /* W */
+#define CROSSMC_KEY_BACK       2u     /* S */
+#define CROSSMC_KEY_LEFT       3u     /* A */
+#define CROSSMC_KEY_RIGHT      4u     /* D */
+#define CROSSMC_KEY_JUMP       5u     /* Space */
+#define CROSSMC_KEY_SNEAK      6u     /* Shift */
+#define CROSSMC_KEY_SPRINT     7u     /* Ctrl */
+#define CROSSMC_KEY_INVENTORY  8u     /* E */
+#define CROSSMC_KEY_DROP       9u     /* Q */
+#define CROSSMC_KEY_SWAP_HANDS 10u    /* F */
+
 typedef struct crossmc_input_event
 {
 	uint32_t type;               /* CROSSMC_INPUT_* */

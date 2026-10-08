@@ -99,11 +99,12 @@ So the Minecraft mod always has a working default from its own jar; a user file 
 | Collision (`ColliderTable`) | ✅ | ✅ proxies via `World#getBlockState` | ✅ exports colliders |
 | Entity (`CrossEntityId`) | ✅ | ✅ proxy entities + damage | ✅ allocates ids |
 | Damage (`DamageRing`) | ✅ | ✅ captures native damage | ✅ applies multipliers |
-| Input (`InputRing`) | ✅ | ✅ consumed into a held-key state¹ | ✅ captures keyboard/mouse |
+| Input (`InputRing`) | ✅ | ✅ injected into `KeyBinding`/`Mouse`¹ | ✅ captures keyboard/mouse |
 | Depth / BlockEdit | ✅ reserved | ⛔ | ⛔ |
 
-¹ The ring is consumed and de-duplicated (`HostInputConsumer`), but not yet applied to Minecraft's
-own movement — so the Minecraft player is still driven by real Minecraft input.
+¹ `HostInputConsumer` maps host keys/buttons into Minecraft's **own** input (`KeyBinding.setPressed`,
+`Mouse.cursorDelta`) so native movement/physics/collision still run — no custom movement. Host mouse
+delta becomes camera look; release/`RELEASE_ALL`/heartbeat-timeout clears held input.
 
 **Player authority:** the Minecraft player is the primary player. The host captures keyboard/mouse
 (→ `InputRing`) and *follows* the Minecraft player (`McState`); the host transform is never written

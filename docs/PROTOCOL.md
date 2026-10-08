@@ -116,3 +116,26 @@ Idle colliders need not be resent every frame.
 - When the host is not alive, Minecraft treats host data (colliders, entities, frames) as **stale**
   and clears its proxies. Reconnect is implicit: when the heartbeat resumes, the snapshot tables are
   re-read and the proxies/colliders are rebuilt (no separate resync protocol yet).
+
+---
+
+## 8. Input application (host -> Minecraft player)
+
+`InputEvent` is the only host → Minecraft **player** channel. Minecraft never reads `HostState`
+position/rotation to move the player.
+
+- `InputEvent.type` = `CROSSMC_INPUT_*`; `code` is:
+  - for `KEY_*`: a **CrossMC keyboard semantic** (`CROSSMC_KEY_FORWARD/BACK/LEFT/RIGHT/JUMP/SNEAK/
+    SPRINT/INVENTORY/DROP/SWAP_HANDS`). A host maps its own keys (e.g. Unity `Key`) to these; the
+    wire format never carries a raw engine key number.
+  - for `MOUSE_*`: `0` left, `1` right, `2` middle.
+- `sequence` is monotonic (order + de-dup); `timestampMs` is informational.
+- **Minecraft-side injection (no custom movement/physics):**
+  - keyboard → `KeyBinding.setPressed(true/false)` on the real `GameOptions` bindings, so
+    `KeyboardInput.tick` and the native player tick compute movement;
+  - mouse buttons → `KeyBinding.setKeyPressed` + `KeyBinding.onKeyPressed` (attack/use/pick);
+  - mouse look → the accumulated delta is added to `Mouse.cursorDeltaX/Y`, so vanilla applies its
+    own sensitivity and calls `changeLookDirection` — Minecraft stays the camera authority.
+- **Lifecycle:** `KEY_DOWN`/`KEY_UP` form a full press/release; `INPUT_RELEASE_ALL` (and host
+  heartbeat timeout or an open GUI) releases every injected key/button, so a host crash can never
+  leave `W`/`Space`/a mouse button stuck. `KEY_HOLD` is optional and not required.

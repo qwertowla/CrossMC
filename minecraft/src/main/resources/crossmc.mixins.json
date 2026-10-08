@@ -4,7 +4,8 @@
 	"package": "dev.crossmc.minecraft.mixin",
 	"compatibilityLevel": "JAVA_21",
 	"client": [
-		"WorldBlockStateMixin"
+		"WorldBlockStateMixin",
+		"MouseMixin"
 	],
 	"injectors": {
 		"defaultRequire": 1

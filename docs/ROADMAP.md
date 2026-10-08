@@ -54,7 +54,9 @@ Progress (protocol v4):
   mouse capture into `InputRing`, and (opt-in) host-player follow of `McState`.
 - **Player authority**: Minecraft is authoritative for the player; host input goes through
   `InputRing`; the host follows `McState`; the host transform is never written back to Minecraft.
-  Minecraft-side application of `InputRing` to actual player movement is not wired yet.
+  `InputRing` is now injected into Minecraft's **own** input (`KeyBinding`/`Mouse`) — no custom
+  movement. In-game behaviour (W/A/S/D, jump, mouse look, collision, release-on-disconnect) is not
+  verified yet.
 - **Not verified in-game yet**: frame content/orientation, collision proxy movement, proxy
   entity binding, damage application (especially `Creature.LocalHit`). See the adapter README.
 
