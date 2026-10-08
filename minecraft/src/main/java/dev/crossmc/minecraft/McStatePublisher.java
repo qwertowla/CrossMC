@@ -15,6 +15,7 @@ import net.minecraft.util.math.Vec3d;
 public final class McStatePublisher {
 	private static final McState STATE = new McState();
 	private static long frames;
+	private static int nullTicks;
 
 	private McStatePublisher() {
 	}
@@ -29,6 +30,11 @@ public final class McStatePublisher {
 		ClientPlayerEntity player = client.player;
 
 		if (player == null) {
+			// Not in a world (title screen / loading): Minecraft is NOT publishing state.
+			if (++nullTicks % 100 == 1) {
+				CrossMcMinecraft.LOGGER.info("CrossMC: not publishing state — no client player (title screen / loading)");
+			}
+
 			return;
 		}
 
@@ -81,5 +87,11 @@ public final class McStatePublisher {
 		STATE.frameCounter = ++frames;
 		memory.writeMcState(STATE);
 		memory.writeMcHeartbeat(System.currentTimeMillis());
+
+		if (frames % 100 == 0) {
+			CrossMcMinecraft.LOGGER.info("CrossMC: publishing McState — player at ({}, {}, {}), flags={}, health={}, hunger={}",
+					String.format("%.1f", pos.x), String.format("%.1f", pos.y), String.format("%.1f", pos.z),
+					flags, STATE.health, STATE.hunger);
+		}
 	}
 }
