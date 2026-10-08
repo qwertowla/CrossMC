@@ -91,8 +91,14 @@ CrossMC/
 | Collision（`ColliderTable`） | ✅ | ✅ 经 `World#getBlockState` 代理 | ✅ 导出 Collider |
 | Entity（`CrossEntityId`） | ✅ | ✅ 代理实体 + 伤害 | ✅ 分配 id |
 | Damage（`DamageRing`） | ✅ | ✅ 捕获原生伤害 | ✅ 施加倍率 |
-| Input（`InputRing`） | ✅ 预留 | ⛔ 尚未消费 | ⛔ 尚未产生 |
+| Input（`InputRing`） | ✅ | ✅ 已消费为按键状态¹ | ✅ 采集键鼠 |
 | Depth / BlockEdit | ✅ 预留 | ⛔ | ⛔ |
+
+¹ 环已被消费并去重（`HostInputConsumer`），但**尚未**接入 Minecraft 自身的移动——因此 Minecraft 玩家
+目前仍由真实的 Minecraft 输入驱动。
+
+**玩家权威：** Minecraft 玩家是主玩家。宿主采集键鼠（→ `InputRing`）并**跟随** Minecraft 玩家
+（`McState`）；宿主 Transform **绝不**回写 Minecraft 玩家。`HostState` 只是宿主环境/表现信息。
 
 各模块均能编译、Java 绑定自检通过；**尚未实机验证**。详见 `docs/ROADMAP.md`、`docs/VERIFICATION.md`、
 `docs/PROTOCOL.md`。

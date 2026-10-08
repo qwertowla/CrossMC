@@ -5,6 +5,9 @@ package dev.crossmc.bridge;
  *
  * <p>Written by Minecraft and read by the host. Small latest-value struct, guarded by a seqlock
  * (see {@link BridgeMemory#writeMcState}/{@link BridgeMemory#readMcState}).
+ *
+ * <p><b>Authority:</b> the Minecraft player is the primary player; this is its authoritative state
+ * and the host follows it. The host must not override the Minecraft player from its own transform.
  */
 public final class McState {
 	public int flags;

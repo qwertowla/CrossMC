@@ -134,6 +134,12 @@ CROSSMC_STATIC_ASSERT(sizeof(Header) == 0x50, "Header size");
 
 /* ====================================================================================
  * HostState @0x0100 — host -> Minecraft. seqlock: seq is odd while writing.
+ *
+ * AUTHORITY: this is the host's OWN avatar/environment, NOT the authority for the Minecraft
+ * player. The Minecraft player is authoritative and its final state travels in McState; host
+ * input travels in InputRing. Only the environment fields (viewport, cameraMode, unitsPerBlock,
+ * worldId) are meaningful to Minecraft. The position/rotation fields are informational (the host
+ * representation) and MUST NOT be used to drive the Minecraft player.
  * ==================================================================================== */
 #define CROSSMC_HOST_IN_GAME   (1u << 0)
 #define CROSSMC_HOST_MENU_OPEN (1u << 1)
@@ -146,8 +152,8 @@ typedef struct crossmc_host_state
 	uint32_t worldId;            /* opaque host world/scene id */
 	uint32_t collisionEpoch;     /* bumps on world change */
 	uint64_t timestampMs;        /* epoch ms of this sample */
-	double   posX, posY, posZ;   /* host player feet, MC space */
-	float    yaw, pitch, roll;   /* authoritative look (MC degrees) */
+	double   posX, posY, posZ;   /* host avatar feet, MC space (informational, NOT authority) */
+	float    yaw, pitch, roll;   /* host camera orientation (informational, NOT authority) */
 	float    eyeHeight;          /* eye above feet, blocks */
 	float    unitsPerBlock;      /* host units per Minecraft block (e.g. ~1.0 for a 1:1 game) */
 	uint32_t teleportSeq;        /* bumps on an authoritative teleport */
@@ -160,6 +166,10 @@ CROSSMC_STATIC_ASSERT(sizeof(HostState) <= 0x100, "HostState must fit its region
 
 /* ====================================================================================
  * McState @0x0200 — Minecraft -> host. seqlock: seq is odd while writing.
+ *
+ * AUTHORITY: the Minecraft player is the PRIMARY player. This struct is the authoritative player
+ * state (position, rotation, flags); the host follows it. The host must never override the
+ * Minecraft player from its own transform — it forwards input instead (InputRing).
  * ==================================================================================== */
 #define CROSSMC_MC_IN_WORLD    (1u << 0)
 #define CROSSMC_MC_SCREEN_OPEN (1u << 1)

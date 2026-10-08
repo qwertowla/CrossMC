@@ -45,6 +45,7 @@ public class CrossMcMinecraftClient implements ClientModInitializer {
 
 			ClientTickEvents.END_CLIENT_TICK.register(client -> {
 				McStatePublisher.tick(client);
+				HostInputConsumer.get().tick(memory);
 
 				// Colliders change slowly; a couple of times per second is plenty.
 				if ((tickCounter++ & 1) == 0) {

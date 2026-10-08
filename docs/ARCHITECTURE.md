@@ -184,6 +184,11 @@ Full semantics live in `docs/PROTOCOL.md`; the essentials:
   `hostEntityId` are resolved through it.
 - **State vs Event**: state = snapshot under seqlock/triple buffer (latest wins, judged by
   `sequence`/`revision`/`timestampMs`); event = SPSC ring with a monotonic `sequence`.
+- **Player authority**: **the Minecraft player is authoritative** (position, velocity, rotation,
+  jump, gravity, collision — all decided by Minecraft, including collisions with host proxies). The
+  host player is a *representation* that follows `McState`. The host → Minecraft player channel is
+  **`InputRing`** (the host captures keys/mouse); the host transform is **never** written back onto
+  the Minecraft player. `HostState` only carries host environment/avatar info (informational).
 - **Authority**: Minecraft owns the player/blocks/entity rules; the host owns host entities and
   colliders; CrossMC only transports.
 

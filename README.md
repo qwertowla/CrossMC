@@ -99,8 +99,15 @@ So the Minecraft mod always has a working default from its own jar; a user file 
 | Collision (`ColliderTable`) | ✅ | ✅ proxies via `World#getBlockState` | ✅ exports colliders |
 | Entity (`CrossEntityId`) | ✅ | ✅ proxy entities + damage | ✅ allocates ids |
 | Damage (`DamageRing`) | ✅ | ✅ captures native damage | ✅ applies multipliers |
-| Input (`InputRing`) | ✅ reserved | ⛔ not consumed yet | ⛔ not produced yet |
+| Input (`InputRing`) | ✅ | ✅ consumed into a held-key state¹ | ✅ captures keyboard/mouse |
 | Depth / BlockEdit | ✅ reserved | ⛔ | ⛔ |
+
+¹ The ring is consumed and de-duplicated (`HostInputConsumer`), but not yet applied to Minecraft's
+own movement — so the Minecraft player is still driven by real Minecraft input.
+
+**Player authority:** the Minecraft player is the primary player. The host captures keyboard/mouse
+(→ `InputRing`) and *follows* the Minecraft player (`McState`); the host transform is never written
+back onto the Minecraft player. `HostState` is host environment/avatar info only.
 
 All modules build and the Java binding self-test passes; **in-game behaviour is not verified yet**.
 See `docs/ROADMAP.md`, `docs/VERIFICATION.md` and `docs/PROTOCOL.md`.

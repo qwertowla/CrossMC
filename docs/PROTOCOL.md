@@ -17,6 +17,34 @@
 A field has exactly one writer. `HostState`/`McState`/collider/entity tables are written by one
 side; the other only reads. Rings have a single producer and a single consumer.
 
+### Player control flow
+
+**Minecraft Player is authoritative.** The host game captures input and *follows* the result; it
+never moves the Minecraft player.
+
+```text
+host keyboard/mouse
+        ↓  (host captures only)
+     InputRing
+        ↓
+    Minecraft            ← Minecraft decides movement/physics/collision
+        ↓
+  Minecraft Player
+        ↓
+     McState
+        ↓
+    host adapter          ← CoordinateMapper
+        ↓
+  host player (follows)
+```
+
+- Host → Minecraft player channel = `InputRing` (input events). There is **no** "host transform →
+  Minecraft player" path.
+- Minecraft → host = `McState` (authoritative position/rotation/flags); the host's
+  `CoordinateMapper` turns it into host space and moves the host player.
+- `HostState` is the host's **own** avatar/environment (viewport, camera mode); its position/rotation
+  are informational and must not drive the Minecraft player.
+
 ---
 
 ## 2. Coordinate space

@@ -5,14 +5,18 @@ package dev.crossmc.bridge;
  *
  * <p>Written by the host game and read by Minecraft. Small latest-value struct, guarded
  * by a seqlock (see {@link BridgeMemory#writeHostState}/{@link BridgeMemory#readHostState}).
+ *
+ * <p><b>Authority:</b> the host's own avatar/environment, <b>not</b> the Minecraft player. The
+ * position/rotation fields below are informational and must never drive the Minecraft player;
+ * host input travels in {@link InputEvent}, and the authoritative player state is in {@link McState}.
  */
 public final class HostState {
 	public int flags;
 	public int worldId;
 	public int collisionEpoch;
 	public long timestampMs;      // epoch ms
-	public double posX, posY, posZ;
-	public float yaw, pitch, roll; // MC degrees
+	public double posX, posY, posZ;        // host avatar (informational; NOT MC authority)
+	public float yaw, pitch, roll;         // host camera (informational; NOT MC authority)
 	public float eyeHeight;
 	public float unitsPerBlock;
 	public int teleportSeq;

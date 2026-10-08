@@ -50,7 +50,11 @@ Progress (protocol v4):
   `World#getBlockState` mixin, hidden armor-stand entity proxies on the integrated server, and
   native damage capture (`ServerLivingEntityEvents.AFTER_DAMAGE`).
 - **Host adapter** (`HowToFishMC` repository — separate from this one) — builds: frame overlay,
-  HostState/collider/entity export, damage consumption with `host.properties` multipliers.
+  HostState/collider/entity export, damage consumption with `host.properties` multipliers, keyboard/
+  mouse capture into `InputRing`, and (opt-in) host-player follow of `McState`.
+- **Player authority**: Minecraft is authoritative for the player; host input goes through
+  `InputRing`; the host follows `McState`; the host transform is never written back to Minecraft.
+  Minecraft-side application of `InputRing` to actual player movement is not wired yet.
 - **Not verified in-game yet**: frame content/orientation, collision proxy movement, proxy
   entity binding, damage application (especially `Creature.LocalHit`). See the adapter README.
 
