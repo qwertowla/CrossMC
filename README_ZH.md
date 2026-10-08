@@ -91,15 +91,16 @@ CrossMC/
 | Collision（`ColliderTable`） | ✅ | ✅ 经 `World#getBlockState` 代理 | ✅ 导出 Collider |
 | Entity（`CrossEntityId`） | ✅ | ✅ 代理实体 + 伤害 | ✅ 分配 id |
 | Damage（`DamageRing`） | ✅ | ✅ 捕获原生伤害 | ✅ 施加倍率 |
-| Input（`InputRing`） | ✅ | ✅ 注入到 `KeyBinding`/`Mouse`¹ | ✅ 采集键鼠 |
+| Input（`InputRing`） | ✅ 通用 | ✅ 可注入 `KeyBinding`/`Mouse`¹ | ⛔ 默认关闭 |
 | Depth / BlockEdit | ✅ 预留 | ⛔ | ⛔ |
 
-¹ `HostInputConsumer` 把宿主按键/鼠标映射进 Minecraft **自身**的输入（`KeyBinding.setPressed`、
-`Mouse.cursorDelta`），因此原生移动/物理/碰撞照常运行——没有自研移动系统。宿主鼠标 delta 变为视角；
-release / `RELEASE_ALL` / 心跳超时都会清空按住的输入。
+¹ `InputRing` 是 CrossMC 的**通用**能力，不是玩家控制路径。若宿主使用它，`HostInputConsumer` 会注入
+Minecraft **自身**的输入；release / `RELEASE_ALL` / 心跳超时会清空按住的输入。玩家正常游玩使用
+Minecraft 自己的输入。
 
-**玩家权威：** Minecraft 玩家是主玩家。宿主采集键鼠（→ `InputRing`）并**跟随** Minecraft 玩家
-（`McState`）；宿主 Transform **绝不**回写 Minecraft 玩家。`HostState` 只是宿主环境/表现信息。
+**玩家权威：** Minecraft 是主游戏，Minecraft 玩家是唯一权威玩家。宿主**玩家与相机镜像 `McState`**
+（固定坐标映射，Health/Hunger 同理）；宿主 Transform **绝不**回写 Minecraft 玩家。`HostState` 只是宿主
+环境/表现信息。
 
 各模块均能编译、Java 绑定自检通过；**尚未实机验证**。详见 `docs/ROADMAP.md`、`docs/VERIFICATION.md`、
 `docs/PROTOCOL.md`。

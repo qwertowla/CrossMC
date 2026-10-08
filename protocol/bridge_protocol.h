@@ -167,9 +167,11 @@ CROSSMC_STATIC_ASSERT(sizeof(HostState) <= 0x100, "HostState must fit its region
 /* ====================================================================================
  * McState @0x0200 — Minecraft -> host. seqlock: seq is odd while writing.
  *
- * AUTHORITY: the Minecraft player is the PRIMARY player. This struct is the authoritative player
- * state (position, rotation, flags); the host follows it. The host must never override the
- * Minecraft player from its own transform — it forwards input instead (InputRing).
+ * AUTHORITY: Minecraft is the main game and the Minecraft player is the ONE authoritative player.
+ * This struct is its authoritative state (position, rotation, health/hunger, flags); the host
+ * MIRRORS it (its player and camera are representations, not a second player). The host never
+ * overrides the Minecraft player. The player's real input is Minecraft's native input; InputRing is
+ * a generic CrossMC capability, not the normal player control path.
  * ==================================================================================== */
 #define CROSSMC_MC_IN_WORLD    (1u << 0)
 #define CROSSMC_MC_SCREEN_OPEN (1u << 1)
@@ -196,7 +198,8 @@ typedef struct crossmc_mc_state
 	float    cameraDistance;
 	uint64_t frameCounter;       /* frames rendered since start */
 	int64_t  tickQpc;            /* QueryPerformanceCounter at the tick */
-	uint32_t reserved0;
+	int32_t  health;             /* Minecraft player health (0..20) -> host player health */
+	int32_t  hunger;             /* Minecraft food level (0..20) -> host player hunger */
 } McState;
 CROSSMC_STATIC_ASSERT(sizeof(McState) <= 0x100, "McState must fit its region");
 

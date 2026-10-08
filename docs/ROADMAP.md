@@ -52,10 +52,10 @@ Progress (protocol v4):
 - **Host adapter** (`HowToFishMC` repository — separate from this one) — builds: frame overlay,
   HostState/collider/entity export, damage consumption with `host.properties` multipliers, keyboard/
   mouse capture into `InputRing`, and (opt-in) host-player follow of `McState`.
-- **Player authority**: Minecraft is authoritative for the player; host input goes through
-  `InputRing`; the host follows `McState`; the host transform is never written back to Minecraft.
-  `InputRing` is now injected into Minecraft's **own** input (`KeyBinding`/`Mouse`) — no custom
-  movement. In-game behaviour (W/A/S/D, jump, mouse look, collision, release-on-disconnect) is not
+- **Player authority**: Minecraft is the main game; the player uses Minecraft's own input; the host
+  player + camera mirror `McState` (fixed coordinate mapping, no per-frame re-anchoring); the host
+  transform is never written back to Minecraft. `InputRing` is a generic CrossMC capability (host
+  capture off by default), not the player path. In-game behaviour of follow/camera/vitals is not
   verified yet.
 - **Not verified in-game yet**: frame content/orientation, collision proxy movement, proxy
   entity binding, damage application (especially `Creature.LocalHit`). See the adapter README.

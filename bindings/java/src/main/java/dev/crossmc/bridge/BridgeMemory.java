@@ -373,6 +373,8 @@ public final class BridgeMemory implements Closeable {
 		map.putFloat((int) b + Protocol.MC_CAMERA_DISTANCE, s.cameraDistance);
 		map.putLong((int) b + Protocol.MC_FRAME_COUNTER, s.frameCounter);
 		map.putLong((int) b + Protocol.MC_TICK_QPC, s.tickQpc);
+		map.putInt((int) b + Protocol.MC_HEALTH, s.health);
+		map.putInt((int) b + Protocol.MC_HUNGER, s.hunger);
 		VarHandle.fullFence();
 		writeSeq(b + Protocol.MC_SEQ, seq + 2);
 	}
@@ -410,6 +412,8 @@ public final class BridgeMemory implements Closeable {
 			s.cameraDistance = map.getFloat((int) b + Protocol.MC_CAMERA_DISTANCE);
 			s.frameCounter = map.getLong((int) b + Protocol.MC_FRAME_COUNTER);
 			s.tickQpc = map.getLong((int) b + Protocol.MC_TICK_QPC);
+			s.health = map.getInt((int) b + Protocol.MC_HEALTH);
+			s.hunger = map.getInt((int) b + Protocol.MC_HUNGER);
 			VarHandle.fullFence();
 
 			if (s1 == readSeq(b + Protocol.MC_SEQ)) {

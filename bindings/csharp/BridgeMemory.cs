@@ -214,6 +214,8 @@ namespace CrossMC.Bridge
             WriteF32(b + 112, s.CameraDistance);
             WriteI64(b + 120, s.FrameCounter);
             WriteI64(b + 128, s.TickQpc);
+            WriteI32(b + 136, s.Health);
+            WriteI32(b + 140, s.Hunger);
             Thread.MemoryBarrier();
             Volatile.Write(ref *(int*)P(b + 0), seq + 2);
         }
@@ -252,6 +254,8 @@ namespace CrossMC.Bridge
                 s.CameraDistance = ReadF32(b + 112);
                 s.FrameCounter = ReadI64(b + 120);
                 s.TickQpc = ReadI64(b + 128);
+                s.Health = ReadI32(b + 136);
+                s.Hunger = ReadI32(b + 140);
                 Thread.MemoryBarrier();
 
                 if (s1 == Volatile.Read(ref *(int*)P(b + 0)))

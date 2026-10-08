@@ -37,6 +37,8 @@ namespace CrossMC.Bridge
         public float CameraDistance;
         public long FrameCounter;
         public long TickQpc;
+        public int Health;   // Minecraft health (0..20) -> host player health
+        public int Hunger;   // Minecraft food level (0..20) -> host player hunger
     }
 
     /// <summary>Mirror of <c>crossmc_collider</c>.</summary>

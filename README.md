@@ -99,16 +99,17 @@ So the Minecraft mod always has a working default from its own jar; a user file 
 | Collision (`ColliderTable`) | ✅ | ✅ proxies via `World#getBlockState` | ✅ exports colliders |
 | Entity (`CrossEntityId`) | ✅ | ✅ proxy entities + damage | ✅ allocates ids |
 | Damage (`DamageRing`) | ✅ | ✅ captures native damage | ✅ applies multipliers |
-| Input (`InputRing`) | ✅ | ✅ injected into `KeyBinding`/`Mouse`¹ | ✅ captures keyboard/mouse |
+| Input (`InputRing`) | ✅ generic | ✅ can inject into `KeyBinding`/`Mouse`¹ | ⛔ off by default |
 | Depth / BlockEdit | ✅ reserved | ⛔ | ⛔ |
 
-¹ `HostInputConsumer` maps host keys/buttons into Minecraft's **own** input (`KeyBinding.setPressed`,
-`Mouse.cursorDelta`) so native movement/physics/collision still run — no custom movement. Host mouse
-delta becomes camera look; release/`RELEASE_ALL`/heartbeat-timeout clears held input.
+¹ `InputRing` is a **generic** CrossMC capability, not the player path. If a host uses it,
+`HostInputConsumer` injects into Minecraft's **own** input and release/`RELEASE_ALL`/heartbeat-timeout
+clears held input. The user plays Minecraft with Minecraft's own input.
 
-**Player authority:** the Minecraft player is the primary player. The host captures keyboard/mouse
-(→ `InputRing`) and *follows* the Minecraft player (`McState`); the host transform is never written
-back onto the Minecraft player. `HostState` is host environment/avatar info only.
+**Player authority:** Minecraft is the main game and the Minecraft player is the one authoritative
+player. The host **player and camera mirror `McState`** (fixed coordinate mapping; health/hunger too);
+the host transform is never written back onto the Minecraft player. `HostState` is host
+environment/avatar info only.
 
 All modules build and the Java binding self-test passes; **in-game behaviour is not verified yet**.
 See `docs/ROADMAP.md`, `docs/VERIFICATION.md` and `docs/PROTOCOL.md`.

@@ -234,6 +234,8 @@ public final class Protocol {
 	public static final int MC_CAMERA_DISTANCE = 112;
 	public static final int MC_FRAME_COUNTER = 120;   // uint64
 	public static final int MC_TICK_QPC = 128;        // int64
+	public static final int MC_HEALTH = 136;          // int32 (0..20)
+	public static final int MC_HUNGER = 140;          // int32 (0..20)
 
 	/** Byte offset of slot {@code i}'s 0x40-byte header. */
 	public static long slotHdr(int i) {

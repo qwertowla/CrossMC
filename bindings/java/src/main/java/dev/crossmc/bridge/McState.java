@@ -6,8 +6,9 @@ package dev.crossmc.bridge;
  * <p>Written by Minecraft and read by the host. Small latest-value struct, guarded by a seqlock
  * (see {@link BridgeMemory#writeMcState}/{@link BridgeMemory#readMcState}).
  *
- * <p><b>Authority:</b> the Minecraft player is the primary player; this is its authoritative state
- * and the host follows it. The host must not override the Minecraft player from its own transform.
+ * <p><b>Authority:</b> Minecraft is the main game and the Minecraft player is the ONE authoritative
+ * player; this is its state and the host mirrors it (player + camera). The host must not override
+ * the Minecraft player.
  */
 public final class McState {
 	public int flags;
@@ -23,6 +24,8 @@ public final class McState {
 	public float cameraDistance;
 	public long frameCounter;
 	public long tickQpc;
+	public int health;            // Minecraft health (0..20) -> host player health
+	public int hunger;            // Minecraft food level (0..20) -> host player hunger
 
 	// ---- flag bits (CROSSMC_MC_*) ----
 	public static final int IN_WORLD = 1 << 0;

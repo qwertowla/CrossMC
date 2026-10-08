@@ -19,30 +19,29 @@ side; the other only reads. Rings have a single producer and a single consumer.
 
 ### Player control flow
 
-**Minecraft Player is authoritative.** The host game captures input and *follows* the result; it
-never moves the Minecraft player.
+**The product is "play Minecraft, with How to Fish integrated as a second world" — not "play
+How to Fish".** Minecraft is the main game and the Minecraft player is the **one** authoritative
+player. The host player/camera mirror it.
 
 ```text
-host keyboard/mouse
-        ↓  (host captures only)
-     InputRing
+player keyboard/mouse
         ↓
-    Minecraft            ← Minecraft decides movement/physics/collision
+   Minecraft native input           ← the REAL player control path
         ↓
-  Minecraft Player
+   Minecraft Player                 ← authoritative position / rotation / health / hunger
         ↓
-     McState
+      McState
         ↓
-    host adapter          ← CoordinateMapper
+   host adapter (CoordinateMapper, fixed origin)
         ↓
-  host player (follows)
+   host player + host camera (representations / followers)
 ```
 
-- Host → Minecraft player channel = `InputRing` (input events). There is **no** "host transform →
-  Minecraft player" path.
-- Minecraft → host = `McState` (authoritative position/rotation/flags); the host's
-  `CoordinateMapper` turns it into host space and moves the host player.
-- `HostState` is the host's **own** avatar/environment (viewport, camera mode); its position/rotation
+- The player's control is **Minecraft's own input**. `InputRing` is a generic CrossMC capability
+  (host → MC events), **not** the normal player control path.
+- Minecraft → host = `McState` (authoritative position/rotation/health/hunger/flags): the host player
+  and host camera mirror it; nothing in Minecraft reads `HostState` to move the player.
+- `HostState` is the host's **own** environment/avatar (viewport, camera mode); its position/rotation
   are informational and must not drive the Minecraft player.
 
 ---
@@ -119,23 +118,16 @@ Idle colliders need not be resent every frame.
 
 ---
 
-## 8. Input application (host -> Minecraft player)
+## 8. InputRing (generic capability — NOT the player control path)
 
-`InputEvent` is the only host → Minecraft **player** channel. Minecraft never reads `HostState`
-position/rotation to move the player.
+`InputEvent` / `InputRing` is a **generic** CrossMC host → Minecraft event channel. The normal
+player is controlled by **Minecraft's own input**, so a host adapter does not need it for normal
+play. It is reserved for host-specific / non-player interaction and future use.
 
-- `InputEvent.type` = `CROSSMC_INPUT_*`; `code` is:
-  - for `KEY_*`: a **CrossMC keyboard semantic** (`CROSSMC_KEY_FORWARD/BACK/LEFT/RIGHT/JUMP/SNEAK/
-    SPRINT/INVENTORY/DROP/SWAP_HANDS`). A host maps its own keys (e.g. Unity `Key`) to these; the
-    wire format never carries a raw engine key number.
-  - for `MOUSE_*`: `0` left, `1` right, `2` middle.
-- `sequence` is monotonic (order + de-dup); `timestampMs` is informational.
-- **Minecraft-side injection (no custom movement/physics):**
-  - keyboard → `KeyBinding.setPressed(true/false)` on the real `GameOptions` bindings, so
-    `KeyboardInput.tick` and the native player tick compute movement;
-  - mouse buttons → `KeyBinding.setKeyPressed` + `KeyBinding.onKeyPressed` (attack/use/pick);
-  - mouse look → the accumulated delta is added to `Mouse.cursorDeltaX/Y`, so vanilla applies its
-    own sensitivity and calls `changeLookDirection` — Minecraft stays the camera authority.
-- **Lifecycle:** `KEY_DOWN`/`KEY_UP` form a full press/release; `INPUT_RELEASE_ALL` (and host
-  heartbeat timeout or an open GUI) releases every injected key/button, so a host crash can never
-  leave `W`/`Space`/a mouse button stuck. `KEY_HOLD` is optional and not required.
+- `InputEvent.type` = `CROSSMC_INPUT_*`; `code` is, for `KEY_*`, a CrossMC keyboard semantic
+  (`CROSSMC_KEY_*`), and for `MOUSE_*`, `0` left / `1` right / `2` middle. `sequence` is monotonic.
+- If a host *does* use it, Minecraft consumes it by injecting into **its own** input
+  (`KeyBinding.setPressed` / `KeyBinding.onKeyPressed`, mouse delta into `Mouse.cursorDeltaX/Y`) — no
+  custom movement — and releases everything on `INPUT_RELEASE_ALL`, heartbeat timeout or an open GUI.
+- `HostInputConsumer` / `MouseMixin` on the Minecraft side implement this, but they only act when a
+  host actually sends events. **Host input capture is off by default** (`input.capture=false`).

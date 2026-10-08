@@ -76,6 +76,8 @@ public final class McStatePublisher {
 		STATE.fovDeg = 70f;
 		STATE.tickMs = 50f;
 		STATE.cameraMode = client.options.getPerspective().isFirstPerson() ? 0 : 1;
+		STATE.health = Math.round(player.getHealth());
+		STATE.hunger = player.getHungerManager().getFoodLevel();
 		STATE.frameCounter = ++frames;
 		memory.writeMcState(STATE);
 		memory.writeMcHeartbeat(System.currentTimeMillis());
