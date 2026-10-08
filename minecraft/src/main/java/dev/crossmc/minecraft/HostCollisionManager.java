@@ -57,6 +57,16 @@ public final class HostCollisionManager {
 			return;
 		}
 
+		if (!memory.hostAlive(System.currentTimeMillis())) {
+			if (enabled) {
+				enabled = false;
+				cells.clear();
+				CrossMcMinecraft.LOGGER.info("CrossMC: host disconnected — collision proxies cleared");
+			}
+
+			return;
+		}
+
 		Collider[] colliders;
 
 		try {

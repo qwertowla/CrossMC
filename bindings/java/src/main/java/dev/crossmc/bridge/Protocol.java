@@ -23,10 +23,24 @@ public final class Protocol {
 	}
 
 	public static final int MAGIC = 0x42434D43;   // 'C','M','C','B'
-	public static final int VERSION = 3;
+	public static final int VERSION = 4;
 
 	public static final String MAPPING_SUBDIR = "CrossMC";
-	public static final String MAPPING_FILE = "bridge_v3.bin";
+	public static final String MAPPING_FILE = "bridge_v4.bin";
+
+	// ---- capabilities (CROSSMC_CAP_*) ----
+	public static final int CAP_FRAME = 1 << 0;
+	public static final int CAP_STATE = 1 << 1;
+	public static final int CAP_ENTITY = 1 << 2;
+	public static final int CAP_COLLISION = 1 << 3;
+	public static final int CAP_DAMAGE = 1 << 4;
+	public static final int CAP_INPUT = 1 << 5;
+	public static final int CAP_DEPTH = 1 << 6;
+	public static final int CAP_BLOCK_EDIT = 1 << 7;
+	public static final int CAP_ALL = CAP_FRAME | CAP_STATE | CAP_ENTITY | CAP_COLLISION
+			| CAP_DAMAGE | CAP_INPUT | CAP_DEPTH | CAP_BLOCK_EDIT;
+
+	public static final long HEARTBEAT_TIMEOUT_MS = 2000L;
 
 	// ---- configuration (see config/crossmc.properties) ---------------------------------
 	public static final String CONFIG_DIR = "config";
@@ -67,8 +81,18 @@ public final class Protocol {
 	public static final int MC_STATE_SIZE = 0x90;
 	public static final int OVERLAY_CONTROL_SIZE = 0x20;
 	public static final int OVERLAY_SLOT_SIZE = 0x40;
-	public static final int INPUT_EVENT_SIZE = 0x18;
+	public static final int INPUT_EVENT_SIZE = 0x20;
 	public static final int INPUT_RING_SIZE = 0x10;
+
+	// Entry-relative field offsets (collider / entity / input)
+	public static final int COLLIDER_REVISION = 12;
+	public static final int ENTITY_CROSS_ID = 44;
+	public static final int INPUT_TYPE = 0;
+	public static final int INPUT_CODE = 4;
+	public static final int INPUT_A = 8;
+	public static final int INPUT_B = 12;
+	public static final int INPUT_TIMESTAMP = 16;
+	public static final int INPUT_SEQUENCE = 24;
 	public static final int DEPTH_FRAME_SIZE = 0x30;
 	public static final int COLLIDER_SIZE = 0x38;
 	public static final int COLLIDER_TABLE_SIZE = 0x20;
@@ -92,6 +116,9 @@ public final class Protocol {
 	public static final int COLLIDER_CAPSULE = 3;
 	public static final int COLLIDER_ENABLED = 1 << 0;
 	public static final int COLLIDER_DYNAMIC = 1 << 1;
+	public static final int COLLIDER_ADDED = 1 << 2;
+	public static final int COLLIDER_UPDATED = 1 << 3;
+	public static final int COLLIDER_REMOVED = 1 << 4;
 
 	// ---- entity kinds / flags (CROSSMC_ENTITY_*) ----
 	public static final int ENTITY_CREATURE = 1;
@@ -114,18 +141,30 @@ public final class Protocol {
 	public static final int DMG_OTHER = 8;
 	public static final int DMG_CRITICAL = 1 << 0;
 
+	// ---- input event types (CROSSMC_INPUT_*) ----
+	public static final int INPUT_KEY_DOWN = 1;
+	public static final int INPUT_KEY_UP = 2;
+	public static final int INPUT_KEY_HOLD = 3;
+	public static final int INPUT_MOUSE_MOVE = 4;
+	public static final int INPUT_MOUSE_DOWN = 5;
+	public static final int INPUT_MOUSE_UP = 6;
+	public static final int INPUT_MOUSE_WHEEL = 7;
+	public static final int INPUT_CURSOR_POS = 8;
+	public static final int INPUT_RELEASE_ALL = 9;
+
 	// Header field offsets
 	public static final long HDR_MAGIC = OFF_HEADER + 0L;
 	public static final long HDR_VERSION = OFF_HEADER + 4L;
 	public static final long HDR_HEADER_SIZE = OFF_HEADER + 8L;
 	public static final long HDR_MAPPING_BYTES = OFF_HEADER + 12L;
-	public static final long HDR_FLAGS = OFF_HEADER + 16L;
+	public static final long HDR_HOST_CAPS = OFF_HEADER + 16L;
 	public static final long HDR_HOST_PID = OFF_HEADER + 20L;
 	public static final long HDR_MC_PID = OFF_HEADER + 24L;
 	public static final long HDR_HOST_STATE_SIZE = OFF_HEADER + 28L;
 	public static final long HDR_MC_STATE_SIZE = OFF_HEADER + 32L;
 	public static final long HDR_OVERLAY_SLOT_SIZE = OFF_HEADER + 36L;
 	public static final long HDR_INPUT_RING_SIZE = OFF_HEADER + 40L;
+	public static final long HDR_MC_CAPS = OFF_HEADER + 44L;
 	public static final long HDR_HOST_HEARTBEAT = OFF_HEADER + 48L;
 	public static final long HDR_MC_HEARTBEAT = OFF_HEADER + 56L;
 	public static final long HDR_SEQUENCE = OFF_HEADER + 64L;

@@ -40,6 +40,19 @@ public final class HostEntityManager {
 			return;
 		}
 
+		if (!memory.hostAlive(System.currentTimeMillis())) {
+			if (!PROXIES.isEmpty()) {
+				for (ArmorStandEntity stand : PROXIES.values()) {
+					stand.discard();
+				}
+
+				PROXIES.clear();
+				CrossMcMinecraft.LOGGER.info("CrossMC: host disconnected — proxy entities removed");
+			}
+
+			return;
+		}
+
 		EntityMap[] rows;
 
 		try {
@@ -99,10 +112,14 @@ public final class HostEntityManager {
 		stand.setInvulnerable(false);
 		stand.setCustomNameVisible(false);
 		stand.addCommandTag(DamageBridge.TAG_MARKER);
-		stand.addCommandTag(DamageBridge.TAG_ID_PREFIX + row.hostEntityId);
+
+		if (row.crossEntityId != 0) {
+			stand.addCommandTag(DamageBridge.TAG_CROSS_PREFIX + row.crossEntityId);
+		}
+
 		world.spawnEntity(stand);
-		CrossMcMinecraft.LOGGER.info("CrossMC: spawned proxy entity for host entity {} at ({}, {}, {})",
-				row.hostEntityId, row.x, row.y, row.z);
+		CrossMcMinecraft.LOGGER.info("CrossMC: spawned proxy entity for CrossEntityId {} (host {}) at ({}, {}, {})",
+				row.crossEntityId, row.hostEntityId, row.x, row.y, row.z);
 		return stand;
 	}
 

@@ -43,6 +43,7 @@ CrossMC/
 ├─ minecraft/                     # Fabric 模组（基本与游戏无关）
 ├─ config/
 │  └─ crossmc.properties          # 配置（共享内存路径等）
+├─ tools/TestHost/                # 极简开发用 Host，验证协议（无 Unity）
 ├─ docs/
 │  ├─ ARCHITECTURE.md
 │  ├─ PORTING.md
@@ -63,7 +64,7 @@ CrossMC/
 ## 配置
 
 `config/crossmc.properties` 控制共享内存的位置（`mapping.path`）。两个进程必须解析到同一个绝对路径。
-值支持 `%VAR%` 占位符与前导 `~`，例如 `%LOCALAPPDATA%/CrossMC/bridge_v3.bin`。
+值支持 `%VAR%` 占位符与前导 `~`，例如 `%LOCALAPPDATA%/CrossMC/bridge_v4.bin`。
 
 配置文件的查找顺序（先匹配者优先）：
 
@@ -105,7 +106,7 @@ Phase 0/1 固定：**仅 Windows**、**Minecraft 1.21.1 + Fabric**、**文件后
 
 ---
 
-## 碰撞 / 实体 / 伤害（协议 v3）
+## 碰撞 / 实体 / 伤害（协议 v4）
 
 在画面链路之外，CrossMC 把两个世界互相映射，同时保持 Minecraft 作为**逻辑/规则侧**：
 
@@ -115,8 +116,13 @@ Phase 0/1 固定：**仅 Windows**、**Minecraft 1.21.1 + Fabric**、**文件后
 - **实体。** 宿主生物通过稳定宿主实体 id（`NetworkObject.ObjectId`）映射为隐藏的 Minecraft 代理实体。
 - **伤害。** 代理实体上的 Minecraft 原生伤害事件（近战、投射物、爆炸/TNT、摔落、火焰、模组）会被转发
   给宿主，由宿主按自己的规则/倍率处理。伤害倍率只存在于宿主适配器仓库（`HowToFishMC`），绝不进 `protocol/`。
+- **身份与能力。** 稳定的 **`CrossEntityId`** 连接 Minecraft 与宿主实体；Header 携带各端的**能力位**
+  （`Frame/State/Entity/Collision/Damage/Input/…`）与心跳，使对端断开可被检测并丢弃陈旧数据。
 
-状态：各模块均能编译；尚未实机验证。详见 `docs/ARCHITECTURE.md` §12 与 `docs/ROADMAP.md`。
+`tools/TestHost` 是一个极简的 dotnet 控制台 Host，用于在无 Unity 的情况下验证共享内存、能力、序号、
+实体生命周期、状态/事件与断开。
+
+状态：各模块均能编译；尚未实机验证。详见 `docs/PROTOCOL.md`、`docs/ARCHITECTURE.md` §9/§12 与 `docs/ROADMAP.md`。
 
 ---
 

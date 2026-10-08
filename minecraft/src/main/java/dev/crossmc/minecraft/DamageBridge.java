@@ -22,8 +22,8 @@ import net.minecraft.registry.tag.DamageTypeTags;
 public final class DamageBridge {
 	/** Marker tag placed on every proxy entity. */
 	public static final String TAG_MARKER = "crossmc_proxy";
-	/** Tag carrying the host entity id: {@code crossmc_id_<n>}. */
-	public static final String TAG_ID_PREFIX = "crossmc_id_";
+	/** Tag carrying the stable CrossEntityId: {@code crossmc_cid_<n>}. */
+	public static final String TAG_CROSS_PREFIX = "crossmc_cid_";
 
 	private DamageBridge() {
 	}
@@ -33,9 +33,9 @@ public final class DamageBridge {
 			return;
 		}
 
-		int hostId = hostIdOf(entity);
+		int crossId = crossIdOf(entity);
 
-		if (hostId == 0) {
+		if (crossId == 0) {
 			return;
 		}
 
@@ -46,12 +46,12 @@ public final class DamageBridge {
 		}
 
 		DamageEvent event = new DamageEvent();
-		event.hostEntityId = hostId;
+		event.crossEntityId = crossId;
 		event.mcEntityId = entity.getId();
 		event.sourceType = classify(source);
 		event.flags = 0;
 		event.amount = damageTaken;
-		event.attackerHostId = 0;
+		event.attackerCrossId = 0;
 		event.x = (float) entity.getX();
 		event.y = (float) entity.getY();
 		event.z = (float) entity.getZ();
@@ -60,16 +60,16 @@ public final class DamageBridge {
 		event.timestampMs = System.currentTimeMillis();
 		memory.pushDamage(event);
 
-		CrossMcMinecraft.LOGGER.info("CrossMC: damage on host entity {} (mc {}) type={} amount={}",
-				hostId, entity.getId(), event.sourceType, damageTaken);
+		CrossMcMinecraft.LOGGER.info("CrossMC: damage on CrossEntityId {} (mc {}) type={} amount={}",
+				crossId, entity.getId(), event.sourceType, damageTaken);
 	}
 
-	/** Parses the host entity id from an entity's command tags, or 0. */
-	public static int hostIdOf(Entity entity) {
+	/** Parses the CrossEntityId from an entity's command tags, or 0. */
+	public static int crossIdOf(Entity entity) {
 		for (String tag : entity.getCommandTags()) {
-			if (tag.startsWith(TAG_ID_PREFIX)) {
+			if (tag.startsWith(TAG_CROSS_PREFIX)) {
 				try {
-					return Integer.parseInt(tag.substring(TAG_ID_PREFIX.length()));
+					return Integer.parseInt(tag.substring(TAG_CROSS_PREFIX.length()));
 				} catch (NumberFormatException ignored) {
 					// fall through
 				}

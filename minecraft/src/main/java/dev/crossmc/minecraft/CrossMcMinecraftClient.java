@@ -39,6 +39,8 @@ public class CrossMcMinecraftClient implements ClientModInitializer {
 			}
 
 			memory.writeMcHeartbeat(System.currentTimeMillis());
+			memory.writeMcCapabilities(Protocol.CAP_FRAME | Protocol.CAP_STATE | Protocol.CAP_ENTITY
+					| Protocol.CAP_COLLISION | Protocol.CAP_DAMAGE | Protocol.CAP_INPUT);
 			FrameExporter.register();
 
 			ClientTickEvents.END_CLIENT_TICK.register(client -> {

@@ -82,7 +82,8 @@ namespace CrossMC.Bridge
             WriteI32(Protocol.HdrVersion, (int)Protocol.Version);
             WriteI32(Protocol.HdrHeaderSize, Protocol.HeaderSize);
             WriteI32(Protocol.HdrMappingBytes, (int)Protocol.MappingBytes);
-            WriteI32(Protocol.HdrFlags, 0);
+            WriteI32(Protocol.HdrHostCaps, 0);
+            WriteI32(Protocol.HdrMcCaps, 0);
             WriteI32(Protocol.HdrHostPid, hostPid);
             WriteI32(Protocol.HdrMcPid, mcPid);
             WriteI32(Protocol.HdrHostStateSize, Protocol.HostStateSize);
@@ -96,6 +97,24 @@ namespace CrossMC.Bridge
         public void WriteHostHeartbeat(long epochMs) => WriteI64(Protocol.HdrHostHeartbeat, epochMs);
         public long ReadMcHeartbeat() => ReadI64(Protocol.HdrMcHeartbeat);
         public long ReadHostHeartbeat() => ReadI64(Protocol.HdrHostHeartbeat);
+
+        public void WriteHostCapabilities(int caps) => WriteI32(Protocol.HdrHostCaps, caps);
+        public void WriteMcCapabilities(int caps) => WriteI32(Protocol.HdrMcCaps, caps);
+        public int ReadHostCapabilities() => ReadI32(Protocol.HdrHostCaps);
+        public int ReadMcCapabilities() => ReadI32(Protocol.HdrMcCaps);
+
+        /// <summary>True if the host heartbeat is fresh (host data may be used).</summary>
+        public bool HostAlive(long nowMs)
+        {
+            long hb = ReadI64(Protocol.HdrHostHeartbeat);
+            return hb != 0 && nowMs - hb <= Protocol.HeartbeatTimeoutMs;
+        }
+
+        public bool McAlive(long nowMs)
+        {
+            long hb = ReadI64(Protocol.HdrMcHeartbeat);
+            return hb != 0 && nowMs - hb <= Protocol.HeartbeatTimeoutMs;
+        }
 
         // ---------------------------------------------------------------- triple buffer
 
@@ -162,6 +181,39 @@ namespace CrossMC.Bridge
             WriteI32(b + 72, s.CameraMode);
             WriteI32(b + 76, s.ViewportW);
             WriteI32(b + 80, s.ViewportH);
+            Thread.MemoryBarrier();
+            Volatile.Write(ref *(int*)P(b + 0), seq + 2);
+        }
+
+        public void WriteMcHeartbeat(long epochMs) => WriteI64(Protocol.HdrMcHeartbeat, epochMs);
+
+        /// <summary>Minecraft -> host. Writes McState under a seqlock (used by Minecraft / tests).</summary>
+        public void WriteMcState(McState s)
+        {
+            long b = Protocol.OffMcState;
+            int seq = Volatile.Read(ref *(int*)P(b + 0));
+            Volatile.Write(ref *(int*)P(b + 0), seq + 1);
+            Thread.MemoryBarrier();
+            WriteI32(b + 4, s.Flags);
+            WriteI64(b + 8, s.TimestampMs);
+            WriteF64(b + 16, s.X);
+            WriteF64(b + 24, s.Y);
+            WriteF64(b + 32, s.Z);
+            WriteF64(b + 40, s.PrevX);
+            WriteF64(b + 48, s.PrevY);
+            WriteF64(b + 56, s.PrevZ);
+            WriteF64(b + 64, s.CurX);
+            WriteF64(b + 72, s.CurY);
+            WriteF64(b + 80, s.CurZ);
+            WriteF32(b + 88, s.Yaw);
+            WriteF32(b + 92, s.Pitch);
+            WriteF32(b + 96, s.EyeHeight);
+            WriteF32(b + 100, s.FovDeg);
+            WriteF32(b + 104, s.TickMs);
+            WriteI32(b + 108, s.CameraMode);
+            WriteF32(b + 112, s.CameraDistance);
+            WriteI64(b + 120, s.FrameCounter);
+            WriteI64(b + 128, s.TickQpc);
             Thread.MemoryBarrier();
             Volatile.Write(ref *(int*)P(b + 0), seq + 2);
         }
@@ -233,6 +285,7 @@ namespace CrossMC.Bridge
                 WriteI32(e + 0, c.Id);
                 WriteI32(e + 4, c.Type);
                 WriteI32(e + 8, c.Flags);
+                WriteI32(e + 12, c.Revision);
                 WriteF32(e + 16, c.CenterX);
                 WriteF32(e + 20, c.CenterY);
                 WriteF32(e + 24, c.CenterZ);
@@ -277,6 +330,7 @@ namespace CrossMC.Bridge
                 WriteF32(e + 32, m.Pitch);
                 WriteF32(e + 36, m.Health);
                 WriteF32(e + 40, m.MaxHealth);
+                WriteI32(e + 44, m.CrossEntityId);
                 WriteI64(e + 48, m.UpdatedMs == 0 ? DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() : m.UpdatedMs);
             }
 
@@ -301,12 +355,12 @@ namespace CrossMC.Bridge
             long e = Protocol.OffDamageEntries + (long)idx * Protocol.DamageEventSize;
             var d = new DamageEvent
             {
-                HostEntityId = ReadI32(e + 0),
+                CrossEntityId = ReadI32(e + 0),
                 McEntityId = ReadI32(e + 4),
                 SourceType = ReadI32(e + 8),
                 Flags = ReadI32(e + 12),
                 Amount = ReadF32(e + 16),
-                AttackerHostId = ReadI32(e + 20),
+                AttackerCrossId = ReadI32(e + 20),
                 X = ReadF32(e + 24),
                 Y = ReadF32(e + 28),
                 Z = ReadF32(e + 32),
@@ -319,11 +373,56 @@ namespace CrossMC.Bridge
             return d;
         }
 
+        /// <summary>Minecraft -> host. Pushes one damage event (single producer). Dev/testing helper.</summary>
+        public void PushDamage(DamageEvent d)
+        {
+            long b = Protocol.OffDamage;
+            int head = ReadI32(b + 0);
+            int idx = (int)(((long)head % Protocol.DamageCapacity + Protocol.DamageCapacity) % Protocol.DamageCapacity);
+            long e = Protocol.OffDamageEntries + (long)idx * Protocol.DamageEventSize;
+            WriteI32(e + 0, d.CrossEntityId);
+            WriteI32(e + 4, d.McEntityId);
+            WriteI32(e + 8, d.SourceType);
+            WriteI32(e + 12, d.Flags);
+            WriteF32(e + 16, d.Amount);
+            WriteI32(e + 20, d.AttackerCrossId);
+            WriteF32(e + 24, d.X);
+            WriteF32(e + 28, d.Y);
+            WriteF32(e + 32, d.Z);
+            WriteF32(e + 36, d.KnockbackX);
+            WriteF32(e + 40, d.KnockbackZ);
+            WriteI64(e + 48, d.Sequence == 0 ? head + 1L : d.Sequence);
+            WriteI64(e + 56, d.TimestampMs == 0 ? DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() : d.TimestampMs);
+            Thread.MemoryBarrier();
+            WriteI32(b + 0, head + 1);
+        }
+
+        /// <summary>Host -> Minecraft. Pushes one input event (single producer).</summary>
+        public void PushInput(InputEvent e)
+        {
+            long b = Protocol.OffInputRing;
+            int head = ReadI32(b + 0);
+            int idx = (int)(((long)head % Protocol.InputRingEntries + Protocol.InputRingEntries) % Protocol.InputRingEntries);
+            long off = Protocol.OffInputEvents + (long)idx * Protocol.InputEventSize;
+            WriteI32(off + Protocol.InputType, e.Type);
+            WriteI32(off + Protocol.InputCode, e.Code);
+            WriteI32(off + Protocol.InputA, e.A);
+            WriteI32(off + Protocol.InputB, e.B);
+            WriteI64(off + Protocol.InputTimestamp,
+                    e.TimestampMs == 0 ? DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() : e.TimestampMs);
+            WriteI64(off + Protocol.InputSequence, e.Sequence == 0 ? head + 1L : e.Sequence);
+            Thread.MemoryBarrier();
+            WriteI32(b + 0, head + 1);
+        }
+
         public void InitTables()
         {
             WriteI32(Protocol.OffColliders + 8, Protocol.ColliderCapacity);
             WriteI32(Protocol.OffEntities + 8, Protocol.EntityCapacity);
             WriteI32(Protocol.OffDamage + 8, Protocol.DamageCapacity);
+            WriteI32(Protocol.OffInputRing + 8, Protocol.InputRingEntries);
+            WriteI32(Protocol.OffInputRing, 0);
+            WriteI32(Protocol.OffInputRing + 4, 0);
             WriteI32(Protocol.OffColliders, 0);
             WriteI32(Protocol.OffColliders + 4, 0);
             WriteI32(Protocol.OffEntities, 0);

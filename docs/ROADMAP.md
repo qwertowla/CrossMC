@@ -35,13 +35,16 @@ Success: a live rectangle in How to Fish showing Minecraft's rendered frame.
 Validates: protocol, shared memory, triple buffer, frame transport, host composition.
 **Not** in this phase: player sync, input, depth, terrain, entities, combat, full camera sync.
 
-Progress (protocol v3):
-- **Protocol** (`protocol/bridge_protocol.h`) — C-compatible (gcc/g++ verified): Header size/seq/ts,
-  HostState/McState seqlocks, overlay triple buffer, `ColliderTable`, `EntityTable`, `DamageRing`,
-  reserved `InputRing`/`DepthFrame`/`BlockEditRing`.
+Progress (protocol v4):
+- **Protocol** (`protocol/bridge_protocol.h`) — C-compatible (gcc/g++ verified): Header with
+  capability bitmasks, size/seq/ts; HostState/McState seqlocks; overlay triple buffer;
+  `ColliderTable` (id + revision + lifecycle flags), `EntityTable` (stable `CrossEntityId`),
+  `DamageRing`, `InputRing` (typed + `sequence`), reserved `DepthFrame`/`BlockEditRing`.
 - **Java binding** (`bindings/java`) — `ShmSelfTest` PASS: mapping, triple buffer, HostState/McState
-  seqlocks, collider/entity tables, damage ring. Standalone Gradle build.
+  seqlocks, collider/entity tables, damage + input rings, capabilities + liveness. Standalone Gradle.
 - **C# binding** (`bindings/csharp`) — mirrors the Java binding; builds with `dotnet build`.
+- **Test host** (`tools/TestHost`) — tiny dotnet console host exercising shared memory,
+  capabilities, sequence, entity lifecycle, state/event and disconnect. Verified running.
 - **Minecraft** (`minecraft/`) — builds: frame producer (BGRA8 bottom-up, throttled, config-driven
   path bundled in the jar), `McState` publisher, host-collision proxies via
   `World#getBlockState` mixin, hidden armor-stand entity proxies on the integrated server, and

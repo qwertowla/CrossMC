@@ -40,6 +40,7 @@ namespace CrossMC.Bridge
         public int Id;
         public int Type;      // Protocol.Collider*
         public int Flags;
+        public int Revision;  // bumps on any geometric change (dirty check)
         public float CenterX, CenterY, CenterZ;
         public float HalfX, HalfY, HalfZ;
         public float RotYaw;
@@ -56,18 +57,29 @@ namespace CrossMC.Bridge
         public float X, Y, Z;
         public float Yaw, Pitch;
         public float Health, MaxHealth;
+        public int CrossEntityId; // STABLE CrossMC key (allocated by the host)
         public long UpdatedMs;
+    }
+
+    /// <summary>Mirror of <c>crossmc_input_event</c>. Host -> Minecraft.</summary>
+    public sealed class InputEvent
+    {
+        public int Type;      // Protocol.Input*
+        public int Code;
+        public int A, B;
+        public long TimestampMs;
+        public long Sequence;
     }
 
     /// <summary>Mirror of <c>crossmc_damage_event</c>.</summary>
     public sealed class DamageEvent
     {
-        public int HostEntityId;
+        public int CrossEntityId;
         public int McEntityId;
         public int SourceType;
         public int Flags;
         public float Amount;
-        public int AttackerHostId;
+        public int AttackerCrossId;
         public float X, Y, Z;
         public float KnockbackX, KnockbackZ;
         public long Sequence;

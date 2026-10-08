@@ -85,7 +85,8 @@ public final class BridgeMemory implements Closeable {
 		map.putInt((int) Protocol.HDR_VERSION, Protocol.VERSION);
 		map.putInt((int) Protocol.HDR_HEADER_SIZE, Protocol.HEADER_SIZE);
 		map.putInt((int) Protocol.HDR_MAPPING_BYTES, (int) Protocol.MAPPING_BYTES);
-		map.putInt((int) Protocol.HDR_FLAGS, 0);
+		map.putInt((int) Protocol.HDR_HOST_CAPS, 0);
+		map.putInt((int) Protocol.HDR_MC_CAPS, 0);
 		map.putInt((int) Protocol.HDR_HOST_PID, hostPid);
 		map.putInt((int) Protocol.HDR_MC_PID, mcPid);
 		map.putInt((int) Protocol.HDR_HOST_STATE_SIZE, Protocol.HOST_STATE_SIZE);
@@ -131,6 +132,37 @@ public final class BridgeMemory implements Closeable {
 
 	public long readHostHeartbeat() {
 		return map.getLong((int) Protocol.HDR_HOST_HEARTBEAT);
+	}
+
+	/** Feature bitmask this process provides (Protocol.CAP_*). */
+	public void writeHostCapabilities(int caps) {
+		map.putInt((int) Protocol.HDR_HOST_CAPS, caps);
+	}
+
+	public void writeMcCapabilities(int caps) {
+		map.putInt((int) Protocol.HDR_MC_CAPS, caps);
+	}
+
+	public int readHostCapabilities() {
+		return map.getInt((int) Protocol.HDR_HOST_CAPS);
+	}
+
+	public int readMcCapabilities() {
+		return map.getInt((int) Protocol.HDR_MC_CAPS);
+	}
+
+	/**
+	 * True if the host is alive: its heartbeat is newer than the timeout. When false, consumers
+	 * must treat host data (state, entities, colliders, frames) as stale and stop using it.
+	 */
+	public boolean hostAlive(long nowMs) {
+		long hb = readHostHeartbeat();
+		return hb != 0 && nowMs - hb <= Protocol.HEARTBEAT_TIMEOUT_MS;
+	}
+
+	public boolean mcAlive(long nowMs) {
+		long hb = readMcHeartbeat();
+		return hb != 0 && nowMs - hb <= Protocol.HEARTBEAT_TIMEOUT_MS;
 	}
 
 	// ------------------------------------------------------------------ triple buffer
@@ -395,7 +427,10 @@ public final class BridgeMemory implements Closeable {
 		map.putInt((int) Protocol.OFF_COLLIDERS + 8, Protocol.COLLIDER_CAPACITY);
 		map.putInt((int) Protocol.OFF_ENTITIES + 8, Protocol.ENTITY_CAPACITY);
 		map.putInt((int) Protocol.OFF_DAMAGE + 8, Protocol.DAMAGE_CAPACITY);
+		map.putInt((int) Protocol.OFF_INPUT_RING + 8, Protocol.INPUT_RING_ENTRIES);
 		map.putInt((int) Protocol.OFF_BLOCK_EDITS + 8, Protocol.BLOCK_EDIT_CAPACITY);
+		map.putInt((int) Protocol.OFF_INPUT_RING, 0);
+		map.putInt((int) Protocol.OFF_INPUT_RING + 4, 0);
 
 		map.putInt((int) Protocol.OFF_COLLIDERS, 0);
 		map.putInt((int) Protocol.OFF_COLLIDERS + 4, 0);
@@ -426,6 +461,7 @@ public final class BridgeMemory implements Closeable {
 			map.putInt((int) e + 0, c.id);
 			map.putInt((int) e + 4, c.type);
 			map.putInt((int) e + 8, c.flags);
+			map.putInt((int) e + 12, c.revision);
 			map.putFloat((int) e + 16, c.centerX);
 			map.putFloat((int) e + 20, c.centerY);
 			map.putFloat((int) e + 24, c.centerZ);
@@ -466,6 +502,7 @@ public final class BridgeMemory implements Closeable {
 				c.id = map.getInt((int) e + 0);
 				c.type = map.getInt((int) e + 4);
 				c.flags = map.getInt((int) e + 8);
+				c.revision = map.getInt((int) e + 12);
 				c.centerX = map.getFloat((int) e + 16);
 				c.centerY = map.getFloat((int) e + 20);
 				c.centerZ = map.getFloat((int) e + 24);
@@ -514,6 +551,7 @@ public final class BridgeMemory implements Closeable {
 			map.putFloat((int) e + 32, m.pitch);
 			map.putFloat((int) e + 36, m.health);
 			map.putFloat((int) e + 40, m.maxHealth);
+			map.putInt((int) e + 44, m.crossEntityId);
 			map.putLong((int) e + 48, m.updatedMs == 0 ? System.currentTimeMillis() : m.updatedMs);
 		}
 
@@ -555,6 +593,7 @@ public final class BridgeMemory implements Closeable {
 				m.pitch = map.getFloat((int) e + 32);
 				m.health = map.getFloat((int) e + 36);
 				m.maxHealth = map.getFloat((int) e + 40);
+				m.crossEntityId = map.getInt((int) e + 44);
 				m.updatedMs = map.getLong((int) e + 48);
 				out[i] = m;
 			}
@@ -575,12 +614,12 @@ public final class BridgeMemory implements Closeable {
 		int head = map.getInt((int) b + 0);
 		int idx = Math.floorMod(head, Protocol.DAMAGE_CAPACITY);
 		long e = Protocol.OFF_DAMAGE_ENTRIES + (long) idx * Protocol.DAMAGE_EVENT_SIZE;
-		map.putInt((int) e + 0, d.hostEntityId);
+		map.putInt((int) e + 0, d.crossEntityId);
 		map.putInt((int) e + 4, d.mcEntityId);
 		map.putInt((int) e + 8, d.sourceType);
 		map.putInt((int) e + 12, d.flags);
 		map.putFloat((int) e + 16, d.amount);
-		map.putInt((int) e + 20, d.attackerHostId);
+		map.putInt((int) e + 20, d.attackerCrossId);
 		map.putFloat((int) e + 24, d.x);
 		map.putFloat((int) e + 28, d.y);
 		map.putFloat((int) e + 32, d.z);
@@ -605,12 +644,12 @@ public final class BridgeMemory implements Closeable {
 		int idx = Math.floorMod(tail, Protocol.DAMAGE_CAPACITY);
 		long e = Protocol.OFF_DAMAGE_ENTRIES + (long) idx * Protocol.DAMAGE_EVENT_SIZE;
 		DamageEvent d = new DamageEvent();
-		d.hostEntityId = map.getInt((int) e + 0);
+		d.crossEntityId = map.getInt((int) e + 0);
 		d.mcEntityId = map.getInt((int) e + 4);
 		d.sourceType = map.getInt((int) e + 8);
 		d.flags = map.getInt((int) e + 12);
 		d.amount = map.getFloat((int) e + 16);
-		d.attackerHostId = map.getInt((int) e + 20);
+		d.attackerCrossId = map.getInt((int) e + 20);
 		d.x = map.getFloat((int) e + 24);
 		d.y = map.getFloat((int) e + 28);
 		d.z = map.getFloat((int) e + 32);
@@ -620,6 +659,45 @@ public final class BridgeMemory implements Closeable {
 		d.timestampMs = map.getLong((int) e + 56);
 		map.putInt((int) b + 4, tail + 1);
 		return d;
+	}
+
+	/** Host -> Minecraft. Pushes one input event (single producer, the host). */
+	public void pushInput(InputEvent in) {
+		long b = Protocol.OFF_INPUT_RING;
+		int head = map.getInt((int) b + 0);
+		int idx = Math.floorMod(head, Protocol.INPUT_RING_ENTRIES);
+		long e = Protocol.OFF_INPUT_EVENTS + (long) idx * Protocol.INPUT_EVENT_SIZE;
+		map.putInt((int) e + Protocol.INPUT_TYPE, in.type);
+		map.putInt((int) e + Protocol.INPUT_CODE, in.code);
+		map.putInt((int) e + Protocol.INPUT_A, in.a);
+		map.putInt((int) e + Protocol.INPUT_B, in.b);
+		map.putLong((int) e + Protocol.INPUT_TIMESTAMP, in.timestampMs == 0 ? System.currentTimeMillis() : in.timestampMs);
+		map.putLong((int) e + Protocol.INPUT_SEQUENCE, in.sequence == 0 ? head + 1L : in.sequence);
+		VarHandle.fullFence();
+		map.putInt((int) b + 0, head + 1);
+	}
+
+	/** Minecraft side: returns the next input event, or {@code null} if none is pending. */
+	public InputEvent pollInput() {
+		long b = Protocol.OFF_INPUT_RING;
+		int head = map.getInt((int) b + 0);
+		int tail = map.getInt((int) b + 4);
+
+		if (tail >= head) {
+			return null;
+		}
+
+		int idx = Math.floorMod(tail, Protocol.INPUT_RING_ENTRIES);
+		long e = Protocol.OFF_INPUT_EVENTS + (long) idx * Protocol.INPUT_EVENT_SIZE;
+		InputEvent in = new InputEvent();
+		in.type = map.getInt((int) e + Protocol.INPUT_TYPE);
+		in.code = map.getInt((int) e + Protocol.INPUT_CODE);
+		in.a = map.getInt((int) e + Protocol.INPUT_A);
+		in.b = map.getInt((int) e + Protocol.INPUT_B);
+		in.timestampMs = map.getLong((int) e + Protocol.INPUT_TIMESTAMP);
+		in.sequence = map.getLong((int) e + Protocol.INPUT_SEQUENCE);
+		map.putInt((int) b + 4, tail + 1);
+		return in;
 	}
 
 	// ------------------------------------------------------------------ slot accessors

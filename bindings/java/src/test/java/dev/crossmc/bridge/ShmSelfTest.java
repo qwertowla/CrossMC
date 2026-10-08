@@ -121,13 +121,16 @@ public final class ShmSelfTest {
 				check(mcRead.frameCounter == mc.frameCounter, "McState frame counter");
 				check(mcRead.timestampMs == mc.timestampMs, "McState timestamp");
 
-				// ---- collider table (host -> MC) ----
-				writer.writeColliderTable(new Collider[] {
-						new Collider(7, Protocol.COLLIDER_BOX, 1f, 2f, 3f, 0.5f, 1f, 0.5f)
-				});
+				// ---- collider table (host -> MC), incl. id + revision + lifecycle ----
+				Collider collider = new Collider(7, Protocol.COLLIDER_BOX, 1f, 2f, 3f, 0.5f, 1f, 0.5f);
+				collider.revision = 5;
+				collider.flags |= Protocol.COLLIDER_ADDED;
+				writer.writeColliderTable(new Collider[] {collider});
 				Collider[] colliders = reader.readColliderTable();
 				check(colliders.length == 1 && colliders[0].id == 7
 						&& colliders[0].halfX == 0.5f && colliders[0].halfY == 1f, "collider table round-trip");
+				check(colliders[0].revision == 5 && (colliders[0].flags & Protocol.COLLIDER_ADDED) != 0,
+						"collider revision + lifecycle");
 
 				// ---- entity table (host -> MC) ----
 				EntityMap entity = new EntityMap();
@@ -138,24 +141,44 @@ public final class ShmSelfTest {
 				entity.z = 3f;
 				entity.health = 10f;
 				entity.maxHealth = 20f;
+				entity.crossEntityId = 99;
 				writer.writeEntityTable(new EntityMap[] {entity});
 				EntityMap[] entities = reader.readEntityTable();
 				check(entities.length == 1 && entities[0].hostEntityId == 42
 						&& entities[0].kind == Protocol.ENTITY_CREATURE
 						&& entities[0].health == 10f, "entity table round-trip");
+				check(entities[0].crossEntityId == 99, "entity CrossEntityId round-trip");
 
 				// ---- damage ring (MC -> host) ----
 				DamageEvent damage = new DamageEvent();
-				damage.hostEntityId = 42;
+				damage.crossEntityId = 99;
 				damage.mcEntityId = 1234;
 				damage.sourceType = Protocol.DMG_EXPLOSION;
 				damage.amount = 20f;
 				writer.pushDamage(damage);
 				DamageEvent damageRead = reader.pollDamage();
-				check(damageRead != null && damageRead.hostEntityId == 42
+				check(damageRead != null && damageRead.crossEntityId == 99
 						&& damageRead.sourceType == Protocol.DMG_EXPLOSION
 						&& damageRead.amount == 20f, "damage ring round-trip");
 				check(reader.pollDamage() == null, "damage ring empty after consuming");
+
+				// ---- capabilities + liveness ----
+				writer.writeHostCapabilities(Protocol.CAP_ALL);
+				writer.writeMcCapabilities(Protocol.CAP_FRAME | Protocol.CAP_STATE);
+				check(reader.readHostCapabilities() == Protocol.CAP_ALL, "host capabilities");
+				check((reader.readMcCapabilities() & Protocol.CAP_FRAME) != 0, "mc capabilities");
+				long now = System.currentTimeMillis();
+				writer.writeHostHeartbeat(now);
+				check(reader.hostAlive(now), "host alive");
+				check(!reader.hostAlive(now + Protocol.HEARTBEAT_TIMEOUT_MS + 1), "host stale after timeout");
+
+				// ---- input ring (host -> MC) ----
+				writer.pushInput(new InputEvent(Protocol.INPUT_KEY_DOWN, 65, 0, 0));
+				InputEvent input = reader.pollInput();
+				check(input != null && input.type == Protocol.INPUT_KEY_DOWN && input.code == 65,
+						"input ring round-trip");
+				check(input.sequence > 0, "input event has a sequence");
+				check(reader.pollInput() == null, "input ring empty after consuming");
 			}
 		}
 

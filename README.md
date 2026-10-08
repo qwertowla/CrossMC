@@ -47,6 +47,7 @@ CrossMC/
 ├─ minecraft/                     # Fabric mod (mostly game-independent)
 ├─ config/
 │  └─ crossmc.properties          # configuration (shared-memory path etc.)
+├─ tools/TestHost/                # tiny dev host to exercise the protocol (no Unity)
 ├─ docs/
 │  ├─ ARCHITECTURE.md
 │  ├─ PORTING.md
@@ -69,7 +70,7 @@ on this one. CrossMC itself owns all the game-independent logic.
 
 `config/crossmc.properties` controls where the shared memory lives (`mapping.path`). Both processes
 must resolve the same absolute file. The value supports `%VAR%` placeholders and a leading `~`, e.g.
-`%LOCALAPPDATA%/CrossMC/bridge_v3.bin`.
+`%LOCALAPPDATA%/CrossMC/bridge_v4.bin`.
 
 The config file is found in this order (first match wins):
 
@@ -117,7 +118,7 @@ implemented and build; the C# host consumer is not started. See `minecraft/READM
 
 ---
 
-## Collision, entities and damage (protocol v3)
+## Collision, entities and damage (protocol v4)
 
 Beyond the frame path, CrossMC maps the two worlds onto each other while keeping Minecraft as the
 logical/rules side:
@@ -131,9 +132,15 @@ logical/rules side:
 - **Damage.** Minecraft's native damage events on those proxies (melee, projectile, explosion/TNT,
   fall, fire, modded) are forwarded to the host, which applies its own rules/multipliers. Damage
   multipliers live in the host adapter repository (`HowToFishMC`), never in `protocol/`.
+- **Identity & capabilities.** A stable **`CrossEntityId`** links Minecraft and host entities;
+  the header carries per-peer **capability bits** (`Frame/State/Entity/Collision/Damage/Input/…`)
+  and heartbeats so a peer can be detected as disconnected and its stale data dropped.
 
-Status: all modules build; in-game behaviour is not yet verified. See `docs/ARCHITECTURE.md` §12 and
-`docs/ROADMAP.md`.
+`tools/TestHost` is a tiny dotnet console host that exercises shared memory, capabilities,
+sequence, entity lifecycle, state/event and disconnect without Unity.
+
+Status: all modules build; in-game behaviour is not yet verified. See `docs/PROTOCOL.md`,
+`docs/ARCHITECTURE.md` §9/§12 and `docs/ROADMAP.md`.
 
 ---
 

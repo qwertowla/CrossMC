@@ -78,5 +78,6 @@ public final class McStatePublisher {
 		STATE.cameraMode = client.options.getPerspective().isFirstPerson() ? 0 : 1;
 		STATE.frameCounter = ++frames;
 		memory.writeMcState(STATE);
+		memory.writeMcHeartbeat(System.currentTimeMillis());
 	}
 }

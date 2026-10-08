@@ -10,6 +10,7 @@ public final class Collider {
 	public int id;
 	public int type;                 // Protocol.COLLIDER_*
 	public int flags;                // Protocol.COLLIDER_*
+	public int revision;             // bumps on any geometric change (dirty check)
 	public float centerX, centerY, centerZ;
 	public float halfX, halfY, halfZ; // box half extents; sphere r=halfX; capsule r=halfX, halfH=halfY
 	public float rotYaw;             // degrees about +Y

@@ -3,7 +3,7 @@ package dev.crossmc.bridge;
 /**
  * Java mirror of {@code crossmc_host_state} in {@code protocol/bridge_protocol.h}.
  *
- * <p>Written by the host (How to Fish) and read by Minecraft. Small latest-value struct, guarded
+ * <p>Written by the host game and read by Minecraft. Small latest-value struct, guarded
  * by a seqlock (see {@link BridgeMemory#writeHostState}/{@link BridgeMemory#readHostState}).
  */
 public final class HostState {

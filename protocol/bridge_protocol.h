@@ -1,8 +1,14 @@
-/* bridge_protocol.h — CrossMC shared-memory protocol (draft v2)
+/* bridge_protocol.h — CrossMC shared-memory protocol (draft v4)
  *
  * This header is the SINGLE SOURCE OF TRUTH for the byte layout. The C# binding
  * (bindings/csharp) and the Java binding (bindings/java) mirror it. If anything here
  * changes, change both mirrors and bump CROSSMC_VERSION.
+ *
+ * Data authority (so both sides never claim the same thing):
+ *   Minecraft owns  : the MC player, MC blocks, MC entity logic, MC rules.
+ *   Host owns       : host entity presentation state, host colliders, host-specific attrs.
+ *   CrossMC owns    : the transport only — protocol, CrossEntityId mapping, State/Event
+ *                     blocks, capability bits. It never owns gameplay state.
  *
  * It is C-compatible: plain C99/C11 constructs only, so it can be included from C, C++
  * (and thus C# via P/Invoke-style structs) without a translation layer.
@@ -11,7 +17,7 @@
  * ------------
  * * SHARED MEMORY IS FILE-BACKED. The Java (Minecraft) side cannot open Win32 named
  *   sections (Local\...); it can only map a file. So both processes map the same file
- *   (default %LOCALAPPDATA%\CrossMC\bridge_v3.bin, configurable through
+ *   (default %LOCALAPPDATA%\CrossMC\bridge_v4.bin, configurable through
  *   config/crossmc.properties -> mapping.path). This is real cross-process shared memory
  *   (the OS page cache backs both mappings); it is just addressed by path.
  * * All multi-byte values are little-endian. Fixed-size POD structs only; no
@@ -22,8 +28,12 @@
  *     - seqlock      : small latest-value structs (single writer), used by HostState/McState
  *     - triple buffer: frames (lock-free, never blocks, never tears)
  *
- * Scope of v1: single host (How to Fish) and a frame-only vertical slice. The state, input
- * and depth layouts exist but are not exercised by the Phase 1 frame path.
+ * Scope: one host game at a time. Payload maturity:
+ *   implemented      : frame (overlay triple buffer), HostState/McState, ColliderTable,
+ *                      EntityTable, DamageRing
+ *   reserved / basic : InputRing, DepthFrame, BlockEditRing
+ * Concrete host adapters (e.g. HowToFishMC) live in separate repositories and never change
+ * this layout.
  */
 
 #ifndef CROSSMC_BRIDGE_PROTOCOL_H
@@ -46,10 +56,25 @@ CROSSMC_EXTERN_C_BEGIN
 /* ---- identity ---------------------------------------------------------------------- */
 /* "CMCB" (CrossMC Bridge), little-endian bytes 'C','M','C','B'. */
 #define CROSSMC_MAGIC   0x42434D43u
-#define CROSSMC_VERSION 3u
+#define CROSSMC_VERSION 4u
 /* Default file-backed mapping (relative to %LOCALAPPDATA%). Overridden by
  * config/crossmc.properties -> mapping.path; both processes must resolve the same file. */
-#define CROSSMC_MAPPING_SUBPATH L"CrossMC\\bridge_v3.bin"
+#define CROSSMC_MAPPING_SUBPATH L"CrossMC\\bridge_v4.bin"
+
+/* ---- capabilities ---------------------------------------------------------------- *
+ * A lightweight feature bitmask each peer advertises in the header. A feature is active
+ * only when BOTH peers advertise it. No negotiation protocol; just "what I can do". */
+#define CROSSMC_CAP_FRAME      (1u << 0)
+#define CROSSMC_CAP_STATE      (1u << 1)
+#define CROSSMC_CAP_ENTITY     (1u << 2)
+#define CROSSMC_CAP_COLLISION  (1u << 3)
+#define CROSSMC_CAP_DAMAGE     (1u << 4)
+#define CROSSMC_CAP_INPUT      (1u << 5)
+#define CROSSMC_CAP_DEPTH      (1u << 6)
+#define CROSSMC_CAP_BLOCK_EDIT (1u << 7)
+#define CROSSMC_CAP_ALL       (CROSSMC_CAP_FRAME | CROSSMC_CAP_STATE | CROSSMC_CAP_ENTITY \
+                             | CROSSMC_CAP_COLLISION | CROSSMC_CAP_DAMAGE | CROSSMC_CAP_INPUT \
+                             | CROSSMC_CAP_DEPTH | CROSSMC_CAP_BLOCK_EDIT)
 
 /* ---- frame geometry (v1 hard cap; pages are committed lazily by the OS) ------------- */
 #define CROSSMC_MAX_FRAME_W     3840u
@@ -90,14 +115,14 @@ typedef struct crossmc_header
 	uint32_t version;            /* CROSSMC_VERSION */
 	uint32_t headerSize;         /* sizeof(Header) — runtime layout check */
 	uint32_t mappingBytes;       /* total mapping size reserved */
-	uint32_t flags;              /* reserved, 0 */
+	uint32_t hostCapabilities;   /* CROSSMC_CAP_* the host provides (written by the host) */
 	uint32_t hostPid;            /* host process id */
 	uint32_t mcPid;              /* Minecraft process id */
 	uint32_t hostStateSize;      /* sizeof(HostState) */
 	uint32_t mcStateSize;        /* sizeof(McState) */
 	uint32_t overlaySlotSize;    /* sizeof(OverlayFrameSlot) */
 	uint32_t inputRingSize;      /* sizeof(InputRing) + capacity * sizeof(InputEvent) */
-	uint32_t reserved0;
+	uint32_t mcCapabilities;     /* CROSSMC_CAP_* Minecraft provides (written by MC) */
 	/* Heartbeats are Unix-epoch milliseconds (a clock both processes share), NOT
 	 * GetTickCount64() (per-boot origin, not comparable across PIDs). */
 	uint64_t hostHeartbeatMs;
@@ -124,7 +149,7 @@ typedef struct crossmc_host_state
 	double   posX, posY, posZ;   /* host player feet, MC space */
 	float    yaw, pitch, roll;   /* authoritative look (MC degrees) */
 	float    eyeHeight;          /* eye above feet, blocks */
-	float    unitsPerBlock;      /* host units per Minecraft block (How to Fish ~ 1.0) */
+	float    unitsPerBlock;      /* host units per Minecraft block (e.g. ~1.0 for a 1:1 game) */
 	uint32_t teleportSeq;        /* bumps on an authoritative teleport */
 	uint32_t cameraMode;         /* 0 first person, 1 behind, 2 front */
 	uint32_t viewportW;
@@ -227,20 +252,36 @@ static inline uint64_t crossmc_overlay_slot(uint32_t i)
 }
 
 /* ====================================================================================
- * InputRing @0x1000 — RESERVED (Phase 3). SPSC ring (host produces, MC consumes).
- * InputRing header at 0x1000; InputEvent entries at 0x1040.
+ * InputRing @0x1000 — SPSC ring (host produces, Minecraft consumes). Protocol reserved;
+ * basic state only (no full input system yet).
+ *
+ * The host is only an input SOURCE; Minecraft interprets events and computes the player
+ * state. Every event carries `sequence` (monotonic) so Minecraft can order and de-duplicate
+ * and never gets stuck: KEY_UP / MOUSE_UP always end a press, and RELEASE_ALL clears every
+ * held key/button (send it on disconnect so Minecraft does not keep stale held inputs).
  * ==================================================================================== */
 #define CROSSMC_INPUT_RING_ENTRIES 2048u
 
+#define CROSSMC_INPUT_KEY_DOWN    1u  /* code = key;      a,b unused            */
+#define CROSSMC_INPUT_KEY_UP      2u  /* code = key                             */
+#define CROSSMC_INPUT_KEY_HOLD    3u  /* code = key;      a = held tick count   */
+#define CROSSMC_INPUT_MOUSE_MOVE  4u  /* a,b = relative dx,dy (pixels)          */
+#define CROSSMC_INPUT_MOUSE_DOWN  5u  /* code = button                          */
+#define CROSSMC_INPUT_MOUSE_UP    6u  /* code = button                          */
+#define CROSSMC_INPUT_MOUSE_WHEEL 7u  /* a   = delta                            */
+#define CROSSMC_INPUT_CURSOR_POS  8u  /* a,b = absolute x,y (screen pixels)     */
+#define CROSSMC_INPUT_RELEASE_ALL 9u  /* clear all held keys/buttons            */
+
 typedef struct crossmc_input_event
 {
-	uint32_t type;               /* key / mouse button / scroll / cursor / text / release-all */
-	uint32_t code;
-	int32_t  a;
-	int32_t  b;
-	uint64_t timestampMs;
+	uint32_t type;               /* CROSSMC_INPUT_* */
+	uint32_t code;               /* key / mouse button code */
+	int32_t  a;                  /* value 1 (dx, wheel delta, cursor x, ...) */
+	int32_t  b;                  /* value 2 (dy, cursor y, ...) */
+	uint64_t timestampMs;        /* epoch ms */
+	uint64_t sequence;           /* monotonic event id (order + de-dup) */
 } InputEvent;
-CROSSMC_STATIC_ASSERT(sizeof(InputEvent) == 0x18, "InputEvent size");
+CROSSMC_STATIC_ASSERT(sizeof(InputEvent) == 0x20, "InputEvent size");
 
 typedef struct crossmc_input_ring
 {
@@ -285,14 +326,20 @@ CROSSMC_STATIC_ASSERT(sizeof(DepthFrame) == 0x30, "DepthFrame size");
  * whole-table seqlock: the writer rewrites count + entries under an odd `seq`, the reader
  * retries until it gets a matching even `seq`.
  *
- * `id` is stable for the lifetime of the host collider so proxies can be updated/removed.
+ * `id` is STABLE for the lifetime of the host collider so proxies can be created/updated/
+ * destroyed. A full rewrite is not required: a consumer can diff by `id` and `revision`
+ * (bump on every change), and the lifecycle flags below let an incremental producer emit
+ * add/update/remove without resending unchanged colliders. `active` = CROSSMC_COLLIDER_ENABLED.
  * ==================================================================================== */
 #define CROSSMC_COLLIDER_BOX     1u
 #define CROSSMC_COLLIDER_SPHERE  2u
 #define CROSSMC_COLLIDER_CAPSULE 3u
 
-#define CROSSMC_COLLIDER_ENABLED (1u << 0)
-#define CROSSMC_COLLIDER_DYNAMIC (1u << 1)
+#define CROSSMC_COLLIDER_ENABLED (1u << 0)  /* active */
+#define CROSSMC_COLLIDER_DYNAMIC (1u << 1)  /* moves; needs update stream */
+#define CROSSMC_COLLIDER_ADDED   (1u << 2)  /* lifecycle: new this revision */
+#define CROSSMC_COLLIDER_UPDATED (1u << 3)  /* lifecycle: changed geometry */
+#define CROSSMC_COLLIDER_REMOVED (1u << 4)  /* lifecycle: gone (id retired) */
 
 #define CROSSMC_COLLIDER_CAPACITY 512u
 
@@ -301,7 +348,7 @@ typedef struct crossmc_collider
 	uint32_t id;                 /* stable host collider id */
 	uint32_t type;               /* CROSSMC_COLLIDER_* */
 	uint32_t flags;              /* CROSSMC_COLLIDER_* */
-	uint32_t reserved0;
+	uint32_t revision;           /* bumps on any geometric change (dirty check) */
 	float    centerX, centerY, centerZ; /* MC space */
 	float    halfX, halfY, halfZ;       /* box half extents; sphere r=halfX; capsule r=halfX, halfH=halfY */
 	float    rotYaw;             /* rotation about +Y, degrees (box/capsule) */
@@ -325,9 +372,21 @@ CROSSMC_STATIC_ASSERT(sizeof(ColliderTable) == 0x20, "ColliderTable size");
  * EntityTable @0x40000 — host entities <-> Minecraft proxy entities.
  *
  * The host publishes its creatures/items/bosses (MC-space position + health). Minecraft
- * spawns one hidden proxy entity per row and binds it to `hostEntityId` (= FishNet
- * NetworkObject.ObjectId). Damage done to the proxy is reported back through DamageRing.
- * `hostEntityId` is the stable key; `mcEntityId` is filled in by Minecraft (0 = unbound).
+ * spawns one hidden proxy entity per row. Damage done to the proxy is reported back
+ * through DamageRing.
+ *
+ * Identity (CrossMC-defined, so nothing depends on a game's native ids):
+ *     Minecraft entity id  <->  crossEntityId  <->  hostEntityId
+ *   - `crossEntityId` is the STABLE CrossMC key. The host MUST allocate it once per host
+ *     entity and keep it for the entity's whole life (never reuse while alive).
+ *   - `hostEntityId` is the host's own id (e.g. FishNet NetworkObject.ObjectId) — for
+ *     debugging/mapping only, never the primary key.
+ *   - `mcEntityId` is filled in by Minecraft for the bound proxy (0 = unbound).
+ *
+ * Lifecycle + mapping queries are derived from the whole-table snapshot: a row that is
+ * present with a new revision = spawn/update; a crossEntityId that is absent = destroy.
+ * The table is rewritten under a seqlock, so consumers see a consistent snapshot and can
+ * diff it against the previous one.
  * ==================================================================================== */
 #define CROSSMC_ENTITY_CREATURE 1u
 #define CROSSMC_ENTITY_PLAYER   2u
@@ -342,14 +401,14 @@ CROSSMC_STATIC_ASSERT(sizeof(ColliderTable) == 0x20, "ColliderTable size");
 
 typedef struct crossmc_entity_map
 {
-	uint32_t hostEntityId;       /* FishNet NetworkObject.ObjectId (stable) */
+	uint32_t hostEntityId;       /* host-native id (debug/mapping only) */
 	uint32_t mcEntityId;         /* bound Minecraft entity id, 0 = unbound */
 	uint32_t kind;               /* CROSSMC_ENTITY_* */
 	uint32_t flags;              /* CROSSMC_ENTITY_* */
 	float    x, y, z;            /* MC space feet position */
 	float    yaw, pitch;
 	float    health, maxHealth;
-	uint32_t reserved0;
+	uint32_t crossEntityId;      /* STABLE CrossMC key (allocated by the host) */
 	uint64_t updatedMs;
 } EntityMap;
 CROSSMC_STATIC_ASSERT(sizeof(EntityMap) == 0x38, "EntityMap size");
@@ -389,16 +448,16 @@ CROSSMC_STATIC_ASSERT(sizeof(EntityTable) == 0x20, "EntityTable size");
 
 typedef struct crossmc_damage_event
 {
-	uint32_t hostEntityId;       /* victim host entity id */
-	uint32_t mcEntityId;         /* victim MC entity id */
+	uint32_t crossEntityId;      /* victim CrossEntityId (primary key) */
+	uint32_t mcEntityId;         /* victim MC entity id (debug) */
 	uint32_t sourceType;         /* CROSSMC_DMG_* */
 	uint32_t flags;              /* CROSSMC_DMG_* */
 	float    amount;             /* raw damage as applied by Minecraft */
-	uint32_t attackerHostId;     /* 0 = none */
+	uint32_t attackerCrossId;    /* 0 = none */
 	float    x, y, z;            /* victim position (MC space) */
 	float    knockbackX, knockbackZ;
 	uint32_t reserved0;
-	uint64_t sequence;
+	uint64_t sequence;           /* monotonic event id (order + de-dup) */
 	uint64_t timestampMs;
 } DamageEvent;
 CROSSMC_STATIC_ASSERT(sizeof(DamageEvent) == 0x40, "DamageEvent size");

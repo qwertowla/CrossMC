@@ -150,7 +150,7 @@ camera sync, input, terrain, entities, combat, GPU sharing, frame lockstep.
 | Platform | Windows only (no macOS/Linux/CrossOver) |
 | Minecraft | 1.21.1 + Fabric (Loader 0.19.5, Fabric API 0.116.17+1.21.1) |
 | Host | How to Fish only (Unity 6 / Mono / BepInEx 5) |
-| Transport | File-backed shared memory, path from `config/crossmc.properties` `mapping.path` (default `%LOCALAPPDATA%\CrossMC\bridge_v3.bin`) |
+| Transport | File-backed shared memory, path from `config/crossmc.properties` `mapping.path` (default `%LOCALAPPDATA%\CrossMC\bridge_v4.bin`) |
 | Frame transfer | CPU readback (no GPU interop yet) |
 | Frame buffering | Triple buffer |
 | State sync | Seqlock latest-value slots |
@@ -173,12 +173,19 @@ Exact encoding is in `protocol/bridge_protocol.h`.
 
 ---
 
-## 9. Coordinates & units
+## 9. Coordinates, identity, state/event
 
-- The protocol always carries **Minecraft space** coordinates; the host adapter converts to/from
-  its own space (handedness + scale).
-- How to Fish (Unity, left-handed) prototype mapping: `(x, y, z) -> (-x, y, z)`, scale 1:1
-  (to be re-verified once camera ownership is decided).
+Full semantics live in `docs/PROTOCOL.md`; the essentials:
+
+- **Coordinates**: the protocol always carries **Minecraft World Space** — right-handed, +Y up,
+  +Z south, 1 unit = 1 block, rotation in degrees (yaw about +Y, pitch about X, roll about Z).
+  Host ↔ MC conversion (handedness, axis flip, origin, scale) is the **host adapter's** job.
+- **Identity**: `CrossEntityId` is the stable CrossMC key; `mcEntityId` and the host-native
+  `hostEntityId` are resolved through it.
+- **State vs Event**: state = snapshot under seqlock/triple buffer (latest wins, judged by
+  `sequence`/`revision`/`timestampMs`); event = SPSC ring with a monotonic `sequence`.
+- **Authority**: Minecraft owns the player/blocks/entity rules; the host owns host entities and
+  colliders; CrossMC only transports.
 
 ---
 
@@ -208,7 +215,7 @@ Policy:
 
 ---
 
-## 12. Cross-space mapping (protocol v3)
+## 12. Cross-space mapping (protocol v4)
 
 Roles for this phase: **Minecraft is the logical/rules side; the host game is the world/presentation
 side.** Minecraft's player is the primary player; host entities map to Minecraft proxy entities;
@@ -256,6 +263,6 @@ DamageRing (SPSC)  →  host adapter  →  multiplier from the host repo config 
 
 ### 12.4 Status
 
-Implemented and building: protocol v3, Java + C# bindings (with tests for Java), the Minecraft
+Implemented and building: protocol v4, Java + C# bindings (with tests for Java), the Minecraft
 collision/entity/damage plumbing, and the How to Fish adapter. **Not yet verified in-game**; see
 `docs/ROADMAP.md`.
