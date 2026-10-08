@@ -19,6 +19,11 @@ namespace CrossMC.Bridge
     /// <summary>Mirror of <c>crossmc_mc_state</c>. Minecraft -> host.</summary>
     public sealed class McState
     {
+        // flag bits (CROSSMC_MC_*)
+        public const int InWorld = 1 << 0;
+        public const int ScreenOpen = 1 << 1;
+        public const int OnGround = 1 << 2;
+
         public int Flags;
         public long TimestampMs;
         public double X, Y, Z;
