@@ -1,7 +1,7 @@
 # bindings/csharp
 
 Thin C# runtime over the CrossMC shared memory, used by C# host adapters (first: How to Fish,
-under `hosts/HowToFish/`).
+under `hosts/HowToFish/` on the `HowToFishMC` branch).
 
 **Status: implemented (mirrors `bindings/java`). Builds with `dotnet build` (netstandard2.1).**
 
@@ -23,7 +23,7 @@ under `hosts/HowToFish/`).
 
 ## What does NOT belong here
 
-- Any How to Fish / Unity / game API access (that is `hosts/HowToFish/`).
+- Any How to Fish / Unity / game API access (that is `hosts/HowToFish/` on the `HowToFishMC` branch).
 - Texture upload or overlay drawing, damage application rules, multipliers.
 
 ## Build

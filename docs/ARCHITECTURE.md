@@ -95,18 +95,19 @@ Consequences:
 One repository. Game-independent code at the top level; each host adapter under `hosts/`.
 
 ```text
-CrossMC/
+CrossMC/  (branch: main)
 ├─ protocol/bridge_protocol.h
 ├─ bindings/{java,csharp}/
 ├─ minecraft/
-├─ hosts/
-│  └─ HowToFish/               first host adapter (game-specific)
-├─ docs/{ARCHITECTURE,PORTING,ROADMAP}.md
+├─ hosts/README.md             host adapters live on per-host branches (not here)
+├─ docs/{ARCHITECTURE,PORTING,ROADMAP,VERIFICATION}.md
 ├─ LICENSE
 └─ README.md
 ```
 
-New hosts are added as `hosts/<Game>/`. They are not branches and not separate repositories.
+`main` is the **game-independent framework**. Each host adapter is developed on its own branch
+and checked out as a sibling worktree, e.g. `HowToFishMC` at `CrossMC/HowToFishMC` containing
+`hosts/HowToFish/`. See `hosts/README.md`.
 
 ---
 

@@ -41,8 +41,7 @@ CrossMC/
 │  ├─ java/                       # Minecraft 模组使用的薄运行时（已实现）
 │  └─ csharp/                     # C# 宿主使用的薄运行时（占位）
 ├─ minecraft/                     # Fabric 模组（基本与游戏无关）
-├─ hosts/
-│  └─ HowToFish/                  # 第一个宿主适配器（游戏相关）
+├─ hosts/                         # 宿主适配器在各宿主分支上（见 hosts/README.md）
 ├─ config/
 │  └─ crossmc.properties          # 配置（共享内存路径等）
 ├─ docs/

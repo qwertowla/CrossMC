@@ -12,10 +12,13 @@
 The adapter is the game-specific half of the bridge. It knows how to talk to one specific game.
 
 ```text
-protocol/ + bindings/    game-independent
-minecraft/               mostly game-independent
-hosts/<Game>/            fully game-specific adapter
+protocol/ + bindings/    game-independent        (branch main)
+minecraft/               mostly game-independent   (branch main)
+hosts/<Game>/            fully game-specific adapter (its own per-host branch/worktree)
 ```
+
+The adapter does **not** live on `main`; create a per-host branch (e.g. `HowToFishMC`) and put the
+adapter under `hosts/<Game>/` there. See `hosts/README.md`.
 
 ---
 

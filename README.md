@@ -44,8 +44,7 @@ CrossMC/
 │  ├─ java/                       # thin runtime used by the Minecraft mod (implemented)
 │  └─ csharp/                     # thin runtime used by C# hosts (placeholder)
 ├─ minecraft/                     # Fabric mod (mostly game-independent)
-├─ hosts/
-│  └─ HowToFish/                  # first host adapter (game-specific)
+├─ hosts/                         # host adapters live on per-host branches (see hosts/README.md)
 ├─ config/
 │  └─ crossmc.properties          # configuration (shared-memory path etc.)
 ├─ docs/
